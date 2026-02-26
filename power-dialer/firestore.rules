@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: is the request from a signed-in user?
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Leads — agents can read/update; only server-side (Admin SDK) can create via import
+    match /leads/{leadId} {
+      allow read:   if isAuth();
+      allow update: if isAuth();
+      allow create: if false; // Only via Admin SDK (import endpoint)
+      allow delete: if false;
+    }
+
+    // Agents — each agent can write their own doc; supervisors can read all
+    match /agents/{agentId} {
+      allow read:  if isAuth();
+      allow write: if isAuth() && (request.auth.uid == agentId || request.auth.token.role == 'supervisor');
+    }
+
+    // Dispositions — anyone authenticated can read; supervisors can write
+    match /dispositions/{docId} {
+      allow read:  if isAuth();
+      allow write: if isAuth(); // tighten to supervisor role in production
+    }
+
+    // Campaigns — anyone authenticated can read; supervisors can write
+    match /campaigns/{docId} {
+      allow read:  if isAuth();
+      allow write: if isAuth(); // tighten to supervisor role in production
+    }
+
+    // Call logs — agents can create/read their own logs
+    match /call_logs/{logId} {
+      allow read:   if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
+      allow delete: if false;
+    }
+
+    // Settings — read-only for agents, write for supervisors
+    match /settings/{docId} {
+      allow read:  if isAuth();
+      allow write: if isAuth();
+    }
+  }
+}

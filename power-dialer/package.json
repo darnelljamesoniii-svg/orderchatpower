@@ -1,0 +1,47 @@
+{
+  "name": "power-dialer-crm",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "14.2.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.5.4",
+    "@types/node": "^20.14.12",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "firebase": "^10.12.4",
+    "firebase-admin": "^12.3.0",
+    "@signalwire/js": "^3.28.0",
+    "@signalwire/node": "^3.9.0",
+    "@google/generative-ai": "^0.15.0",
+    "papaparse": "^5.4.1",
+    "@types/papaparse": "^5.3.14",
+    "date-fns": "^3.6.0",
+    "date-fns-tz": "^3.1.3",
+    "zod": "^3.23.8",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.417.0",
+    "tailwind-merge": "^2.4.0",
+    "react-hot-toast": "^2.4.1",
+    "recharts": "^2.12.7",
+    "swr": "^2.2.5",
+    "uuid": "^10.0.0",
+    "@types/uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.7",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.40",
+    "@tailwindcss/forms": "^0.5.7",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.5"
+  }
+}
