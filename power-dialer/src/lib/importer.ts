@@ -8,6 +8,7 @@ export interface CsvRow {
   contactName:  string;
   phone:        string;
   email?:       string;
+  address?:     string;
   kgmid:        string;
   timezone:     string;
   utcOffsetHours: number;
