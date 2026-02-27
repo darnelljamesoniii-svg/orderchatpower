@@ -1,4 +1,5 @@
 // ─── Zone Ownership — Firestore-backed exclusivity engine ────────────────────
+import 'server-only';
 import { adminDb } from '@/lib/firebase-admin';
 
 // Simple geohash implementation (no external dependency)
