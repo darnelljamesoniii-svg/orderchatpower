@@ -15,6 +15,7 @@ function AgentStatusDot({ status }: { status: Agent['status'] }) {
     AVAILABLE: 'bg-accent',
     PAUSED:    'bg-amber',
     OFFLINE:   'bg-muted',
+    BUSY:      'bg-orange-400',
   };
   return <div className={`w-2 h-2 rounded-full flex-shrink-0 ${map[status]}`} />;
 }
