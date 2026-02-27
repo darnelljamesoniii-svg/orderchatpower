@@ -20,7 +20,7 @@
     "firebase": "^10.12.4",
     "firebase-admin": "^12.3.0",
     "@signalwire/js": "^3.28.0",
-    "@signalwire/realtime-api": "^4.2.0"
+    "@signalwire/realtime-api": "^4.2.0",
     "@google/generative-ai": "^0.15.0",
     "papaparse": "^5.4.1",
     "@types/papaparse": "^5.3.14",
