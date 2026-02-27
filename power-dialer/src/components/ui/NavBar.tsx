@@ -10,7 +10,7 @@ const TABS = [
   { href: '/supervisor', label: 'Supervisor'      },
 ];
 
-export default function NavBar() {
+export function NavBar() {
   const pathname = usePathname();
 
   return (
@@ -25,7 +25,7 @@ export default function NavBar() {
 
       {/* Tabs */}
       <div className="flex items-stretch h-full gap-0">
-        {TABS.map(tab => (
+        {TABS.map((tab) => (
           <Link
             key={tab.href}
             href={tab.href}
@@ -49,3 +49,5 @@ export default function NavBar() {
     </nav>
   );
 }
+
+export default NavBar;
