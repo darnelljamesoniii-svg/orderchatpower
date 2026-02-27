@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase'; // adjust if your path differs
+import { db } from '@/lib/firebase'; // <-- adjust this path if needed
 import { COLLECTIONS, DEFAULT_CAMPAIGNS } from '@/lib/collections';
 import type { CampaignWave } from '@/types';
 import { Card } from '@/components/ui/Card';
@@ -42,11 +42,7 @@ export default function WaveControls() {
     }
   };
 
-  const updateHours = async (
-    wave: CampaignWave,
-    field: 'startHourLocal' | 'endHourLocal',
-    val: number,
-  ) => {
+  const updateHours = async (wave: CampaignWave, field: 'startHourLocal' | 'endHourLocal', val: number) => {
     try {
       await updateDoc(doc(db, COLLECTIONS.CAMPAIGNS, wave.id), { [field]: val });
     } catch {
@@ -64,13 +60,8 @@ export default function WaveControls() {
                 <div className="text-white font-rajdhani font-bold text-sm">{wave.name}</div>
                 <div className="text-muted text-[11px]">{wave.description}</div>
               </div>
-
               <button onClick={() => toggle(wave)} className="transition-colors" type="button">
-                {wave.isActive ? (
-                  <ToggleRight size={28} className="text-neon" />
-                ) : (
-                  <ToggleLeft size={28} className="text-muted" />
-                )}
+                {wave.isActive ? <ToggleRight size={28} className="text-neon" /> : <ToggleLeft size={28} className="text-muted" />}
               </button>
             </div>
 
@@ -84,9 +75,7 @@ export default function WaveControls() {
                   className="bg-surface border border-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-accent"
                 >
                   {Array.from({ length: 24 }, (_, i) => (
-                    <option key={i} value={i}>
-                      {i.toString().padStart(2, '0')}:00 {i < 12 ? 'AM' : 'PM'}
-                    </option>
+                    <option key={i} value={i}>{i.toString().padStart(2, '0')}:00 {i < 12 ? 'AM' : 'PM'}</option>
                   ))}
                 </select>
 
@@ -97,9 +86,7 @@ export default function WaveControls() {
                   className="bg-surface border border-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-accent"
                 >
                   {Array.from({ length: 24 }, (_, i) => (
-                    <option key={i} value={i}>
-                      {i.toString().padStart(2, '0')}:00 {i < 12 ? 'AM' : 'PM'}
-                    </option>
+                    <option key={i} value={i}>{i.toString().padStart(2, '0')}:00 {i < 12 ? 'AM' : 'PM'}</option>
                   ))}
                 </select>
 
