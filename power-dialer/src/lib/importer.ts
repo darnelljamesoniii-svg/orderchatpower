@@ -1,3 +1,4 @@
+import 'server-only';
 import { adminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS } from '@/lib/collections';
 import type { Lead } from '@/types';
