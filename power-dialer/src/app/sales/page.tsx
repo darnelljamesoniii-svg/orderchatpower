@@ -3,11 +3,11 @@
 // SignalWire SDK cannot be SSR'd — must be client-only
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
-import { NavBar } from '@/components/ui/NavBar';
-
+import NavBar from '@/components/ui/NavBar';
 const BattleStation = dynamic(
   () => import('@/components/battle-station/BattleStation'),
-  { ssr: false, loading: () => (
+  { ssr: false, 
+   loading: () => (
     <div className="flex items-center justify-center h-full">
       <div className="text-muted text-sm animate-pulse">Loading Battle Station…</div>
     </div>
