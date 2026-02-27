@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase'; // <-- if your db lives elsewhere, change this import
+import { db } from '@/lib/firebase'; // adjust if your path differs
 import { COLLECTIONS, DEFAULT_CAMPAIGNS } from '@/lib/collections';
 import type { CampaignWave } from '@/types';
 import { Card } from '@/components/ui/Card';
@@ -25,7 +25,6 @@ export default function WaveControls() {
             );
           });
         } else {
-          // Seed defaults server-side (DO NOT import firebase-admin in client components)
           fetch('/api/campaigns/seed', { method: 'POST' }).catch(() => {});
         }
       });
@@ -108,11 +107,7 @@ export default function WaveControls() {
               </div>
             </div>
 
-            <div
-              className={`flex items-center gap-2 text-[10px] font-rajdhani font-bold tracking-widest uppercase ${
-                wave.isActive ? 'text-neon' : 'text-muted'
-              }`}
-            >
+            <div className={`flex items-center gap-2 text-[10px] font-rajdhani font-bold tracking-widest uppercase ${wave.isActive ? 'text-neon' : 'text-muted'}`}>
               <div className={`w-1.5 h-1.5 rounded-full ${wave.isActive ? 'bg-neon animate-pulseGlow' : 'bg-muted'}`} />
               {wave.isActive ? 'ACTIVE — DIALING' : 'PAUSED'}
             </div>
