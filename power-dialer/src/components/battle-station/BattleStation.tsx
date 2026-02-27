@@ -174,7 +174,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
           body:    JSON.stringify({
             leadId:       currentLead?.id,
             agentId,
-            callSid: call.parameters?.CallSid ?? callSid ?? null,
+            callSid: callSid ?? null,
           }),
         });
         const data = await res.json();
