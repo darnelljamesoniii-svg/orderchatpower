@@ -5,7 +5,7 @@ import type { TranscriptEntry } from '@/types';
 
 interface UseSpeechTranscriptionOptions {
   onTranscript?: (entries: TranscriptEntry[]) => void;
-  onObjection?:  (text: string) => void;
+  onObjection?: (text: string) => void;
 }
 
 const OBJECTION_KEYWORDS = [
@@ -14,55 +14,59 @@ const OBJECTION_KEYWORDS = [
   'have someone', 'contract', 'too much', 'happy with',
 ];
 
-export function useSpeechTranscription({ onTranscript, onObjection }: UseSpeechTranscriptionOptions = {}) {
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const [isListening, setIsListening]   = useState(false);
-  const [transcript,  setTranscript]    = useState<TranscriptEntry[]>([]);
-  const [lastText,    setLastText]      = useState('');
+export function useSpeechTranscription(
+  { onTranscript, onObjection }: UseSpeechTranscriptionOptions = {}
+) {
+  const recognitionRef = useRef<any>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
+  const [lastText, setLastText] = useState('');
 
-  const addEntry = useCallback((text: string, speaker: 'agent' | 'lead' = 'lead') => {
-    const entry: TranscriptEntry = { speaker, text, timestamp: new Date().toISOString() };
-    setTranscript(prev => {
-      const next = [...prev, entry];
-      onTranscript?.(next);
-      return next;
-    });
-    setLastText(text);
+  const addEntry = useCallback(
+    (text: string, speaker: 'agent' | 'lead' = 'lead') => {
+      const entry: TranscriptEntry = { speaker, text, timestamp: new Date().toISOString() };
+      setTranscript((prev) => {
+        const next = [...prev, entry];
+        onTranscript?.(next);
+        return next;
+      });
+      setLastText(text);
 
-    // Detect objections
-    const lower = text.toLowerCase();
-    if (OBJECTION_KEYWORDS.some(kw => lower.includes(kw))) {
-      onObjection?.(text);
-    }
-  }, [onTranscript, onObjection]);
+      const lower = text.toLowerCase();
+      if (OBJECTION_KEYWORDS.some((kw) => lower.includes(kw))) {
+        onObjection?.(text);
+      }
+    },
+    [onTranscript, onObjection]
+  );
 
   const start = useCallback(() => {
     if (typeof window === 'undefined') return;
-   const SpeechRecognitionCtor =
-  (window as any).SpeechRecognition ||
-  (window as any).webkitSpeechRecognition;
+    if (recognitionRef.current) return; // already running
 
-if (!SpeechRecognitionCtor) {
-  console.warn('Speech recognition not supported');
-  return;
-}
+    const SpeechRecognitionCtor =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
+    if (!SpeechRecognitionCtor) {
+      console.warn('Speech recognition not supported');
+      return;
+    }
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous    = true;
+    const recognition = new SpeechRecognitionCtor();
+    recognition.continuous = true;
     recognition.interimResults = false;
-    recognition.lang           = 'en-US';
+    recognition.lang = 'en-US';
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    recognition.onresult = (event: any) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
-          addEntry(event.results[i][0].transcript.trim(), 'lead');
+          addEntry(String(event.results[i][0].transcript || '').trim(), 'lead');
         }
       }
     };
 
-    recognition.onerror = (e: SpeechRecognitionErrorEvent) => {
-      if (e.error !== 'no-speech') console.error('Speech error:', e.error);
+    recognition.onerror = (e: any) => {
+      if (e?.error !== 'no-speech') console.error('Speech error:', e?.error ?? e);
     };
 
     recognition.onend = () => {
@@ -76,7 +80,9 @@ if (!SpeechRecognitionCtor) {
   }, [addEntry]);
 
   const stop = useCallback(() => {
-    recognitionRef.current?.stop();
+    try {
+      recognitionRef.current?.stop?.();
+    } catch {}
     recognitionRef.current = null;
     setIsListening(false);
   }, []);
