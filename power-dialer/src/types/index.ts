@@ -13,7 +13,8 @@ export interface Lead {
   id:              string;
   businessName:    string;
   contactName:     string;
-  phone:           string;
+  phone:  
+  email:           string;
   kgmid:           string;
   timezone:        string;
   utcOffsetHours:  number;
