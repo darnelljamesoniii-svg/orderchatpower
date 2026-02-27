@@ -13,7 +13,6 @@ export interface CsvRow {
   timezone:     string;
   utcOffsetHours: number;
   campaign:     'wave1' | 'wave2';
-  address?:     string;
 }
 
 export interface ImportResult {
