@@ -18,23 +18,34 @@ export function useSpeechTranscription(
   { onTranscript, onObjection }: UseSpeechTranscriptionOptions = {}
 ) {
   const recognitionRef = useRef<any>(null);
+  const shouldListenRef = useRef(false);
+
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [lastText, setLastText] = useState('');
 
   const addEntry = useCallback(
     (text: string, speaker: 'agent' | 'lead' = 'lead') => {
-      const entry: TranscriptEntry = { speaker, text, timestamp: new Date().toISOString() };
+      const cleaned = String(text || '').trim();
+      if (!cleaned) return;
+
+      const entry: TranscriptEntry = {
+        speaker,
+        text: cleaned,
+        timestamp: new Date().toISOString(),
+      };
+
       setTranscript((prev) => {
         const next = [...prev, entry];
         onTranscript?.(next);
         return next;
       });
-      setLastText(text);
 
-      const lower = text.toLowerCase();
+      setLastText(cleaned);
+
+      const lower = cleaned.toLowerCase();
       if (OBJECTION_KEYWORDS.some((kw) => lower.includes(kw))) {
-        onObjection?.(text);
+        onObjection?.(cleaned);
       }
     },
     [onTranscript, onObjection]
@@ -42,13 +53,20 @@ export function useSpeechTranscription(
 
   const start = useCallback(() => {
     if (typeof window === 'undefined') return;
-    if (recognitionRef.current) return; // already running
 
     const SpeechRecognitionCtor =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognitionCtor) {
       console.warn('Speech recognition not supported');
+      return;
+    }
+
+    // If already running, just mark intent and return
+    shouldListenRef.current = true;
+    if (recognitionRef.current) {
+      try { recognitionRef.current.start?.(); } catch {}
+      setIsListening(true);
       return;
     }
 
@@ -60,36 +78,47 @@ export function useSpeechTranscription(
     recognition.onresult = (event: any) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
-          addEntry(String(event.results[i][0].transcript || '').trim(), 'lead');
+          addEntry(event.results[i][0]?.transcript, 'lead');
         }
       }
     };
 
     recognition.onerror = (e: any) => {
+      // no-speech is common noise; ignore it
       if (e?.error !== 'no-speech') console.error('Speech error:', e?.error ?? e);
     };
 
     recognition.onend = () => {
-      // Auto-restart if still supposed to be listening
-      if (recognitionRef.current) recognition.start();
+      // only restart if user still wants listening
+      if (shouldListenRef.current) {
+        try { recognition.start(); } catch {}
+      }
     };
 
     recognitionRef.current = recognition;
-    recognition.start();
+
+    try { recognition.start(); } catch {}
     setIsListening(true);
   }, [addEntry]);
 
   const stop = useCallback(() => {
-    try {
-      recognitionRef.current?.stop?.();
-    } catch {}
-    recognitionRef.current = null;
+    shouldListenRef.current = false;
     setIsListening(false);
+
+    try { recognitionRef.current?.stop?.(); } catch {}
+    recognitionRef.current = null;
   }, []);
 
   const clear = useCallback(() => setTranscript([]), []);
 
-  useEffect(() => () => { stop(); }, [stop]);
+  useEffect(() => {
+    return () => {
+      // cleanup on unmount
+      shouldListenRef.current = false;
+      try { recognitionRef.current?.stop?.(); } catch {}
+      recognitionRef.current = null;
+    };
+  }, []);
 
   return { isListening, transcript, lastText, start, stop, clear, addEntry };
 }
