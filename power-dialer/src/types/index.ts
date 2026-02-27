@@ -12,9 +12,9 @@ export type LeadStatus =
 export interface Lead {
   id:              string;
   businessName:    string;
-  contactName:     string;
-  phone:  
-  email:           string;
+  contactName?:    string;
+  phone:           string;
+  email?:          string;
   kgmid:           string;
   timezone:        string;
   utcOffsetHours:  number;
