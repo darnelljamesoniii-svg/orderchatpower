@@ -47,7 +47,7 @@ if (!SpeechRecognitionCtor) {
   return;
 }
 
-const recognition = new SpeechRecognitionCtor();
+
     const recognition = new SpeechRecognition();
     recognition.continuous    = true;
     recognition.interimResults = false;
