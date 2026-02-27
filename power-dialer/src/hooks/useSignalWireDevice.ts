@@ -44,49 +44,39 @@ export function useSignalWireDevice({
   }, []);
 
   const init = useCallback(async () => {
-    try {
-      // Fetch access token from our API
-      const res  = await fetch('/api/signalwire/token', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ agentId }),
-      });
-      const { token } = await res.json();
-      if (!token) throw new Error('No token returned from /api/signalwire/token');
+try {
+  // Fetch access token from our API
+  const res = await fetch('/api/signalwire/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agentId }),
+  });
 
-      // Dynamically import SignalWire JS SDK (avoids SSR crash)
-      const { Voice } = await import('@signalwire/js');
+  const { token } = await res.json();
+  if (!token) throw new Error('No token returned from /api/signalwire/token');
 
-      const device = new Voice.Client(token, {
-        logLevel: 'error',
-        codecPreferences: ['OPUS', 'PCMU'],
-      }) as unknown as SWDevice;
+  // Dynamically import SignalWire JS SDK (avoids SSR crash)
+  const SW = await import('@signalwire/js');
 
-      device.on('error', (err: Error) => {
-        setError(err.message);
-        setState('error');
-        onError?.(err);
-      });
+  const Voice = (SW as any).default?.Voice ?? (SW as any).Voice;
+  if (!Voice?.Client) {
+    throw new Error('SignalWire Voice Client not found on @signalwire/js export');
+  }
 
-      device.on('incoming', (call: SWCall) => {
-        callRef.current = call;
-        setState('ringing');
-        call.on('accept', () => {
-          setState('in-call');
-          setCallSid(call.parameters?.CallSid ?? null);
-          startTimer();
-          onCallConnected?.(call);
-        });
-      });
+  const device = new Voice.Client(token, {
+    logLevel: 'error',
+    // keep your existing options
+  });
 
-      await device.register();
-      deviceRef.current = device;
-      setState('idle');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Device init failed';
-      setError(msg);
-      setState('error');
-    }
+  await device.register();
+  deviceRef.current = device;
+  setState('idle');
+
+} catch (err: unknown) {
+  const msg = err instanceof Error ? err.message : 'Device init failed';
+  setError(msg);
+  setState('error');
+}
   }, [agentId, onCallConnected, onError, startTimer]);
 
   useEffect(() => {
