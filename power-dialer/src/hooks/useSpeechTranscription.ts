@@ -38,9 +38,16 @@ export function useSpeechTranscription({ onTranscript, onObjection }: UseSpeechT
 
   const start = useCallback(() => {
     if (typeof window === 'undefined') return;
-    const SpeechRecognition = window.SpeechRecognition || (window as unknown as { webkitSpeechRecognition: typeof SpeechRecognition }).webkitSpeechRecognition;
-    if (!SpeechRecognition) { console.warn('Speech recognition not supported'); return; }
+   const SpeechRecognitionCtor =
+  (window as any).SpeechRecognition ||
+  (window as any).webkitSpeechRecognition;
 
+if (!SpeechRecognitionCtor) {
+  console.warn('Speech recognition not supported');
+  return;
+}
+
+const recognition = new SpeechRecognitionCtor();
     const recognition = new SpeechRecognition();
     recognition.continuous    = true;
     recognition.interimResults = false;
