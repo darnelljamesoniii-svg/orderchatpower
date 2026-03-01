@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useSignalWireDevice } from '@/hooks/useSignalWireDevice';
@@ -22,7 +22,7 @@ interface BattleStationProps {
   agentName: string;
 }
 
-// ── Waveform ──────────────────────────────────────────────────────────────────
+// â”€â”€ Waveform â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Waveform() {
   return (
     <div className="flex items-center gap-[3px] h-6">
@@ -34,26 +34,26 @@ function Waveform() {
   );
 }
 
-// ── Battle Card ───────────────────────────────────────────────────────────────
+// â”€â”€ Battle Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function BattleCardDisplay({ card, loading }: { card: BattleCard | null; loading: boolean }) {
   if (loading) return (
     <div className="flex items-center gap-2 text-accent text-xs">
-      <Loader2 size={14} className="animate-spin" /> Generating battle card…
+      <Loader2 size={14} className="animate-spin" /> Generating battle cardâ€¦
     </div>
   );
   if (!card) return (
     <p className="text-muted text-xs">
-      AI coach activates automatically when an objection keyword is detected…
+      AI coach activates automatically when an objection keyword is detectedâ€¦
     </p>
   );
   return (
     <div className="space-y-2">
       <div className="bg-neon/5 border border-neon/20 rounded-lg p-3">
-        <div className="text-[10px] tracking-widest uppercase text-neon font-bold mb-1">⚡ Rebuttal</div>
+        <div className="text-[10px] tracking-widest uppercase text-neon font-bold mb-1">âš¡ Rebuttal</div>
         <p className="text-white text-[13px]">"{card.rebuttal}"</p>
       </div>
       <div className="bg-accent/5 border border-accent/20 rounded-lg p-3">
-        <div className="text-[10px] tracking-widest uppercase text-accent font-bold mb-1">🎯 Follow Up</div>
+        <div className="text-[10px] tracking-widest uppercase text-accent font-bold mb-1">ðŸŽ¯ Follow Up</div>
         <p className="text-white text-[13px]">"{card.followUp}"</p>
       </div>
       <div className="bg-amber/5 border border-amber/20 rounded-lg p-2 flex items-center gap-2">
@@ -64,7 +64,7 @@ function BattleCardDisplay({ card, loading }: { card: BattleCard | null; loading
   );
 }
 
-// ── Inline editable field ─────────────────────────────────────────────────────
+// â”€â”€ Inline editable field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function InlineEdit({ leadId, field, value, placeholder, icon }: {
   leadId: string; field: string; value?: string; placeholder: string; icon: string;
 }) {
@@ -120,7 +120,7 @@ function InlineEdit({ leadId, field, value, placeholder, icon }: {
   );
 }
 
-// ── Email Compose Modal ───────────────────────────────────────────────────────
+// â”€â”€ Email Compose Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function EmailModal({ lead, agentName, onClose }: {
   lead: Lead; agentName: string; onClose: () => void;
 }) {
@@ -228,7 +228,7 @@ function EmailModal({ lead, agentName, onClose }: {
   );
 }
 
-// ── Main BattleStation ────────────────────────────────────────────────────────
+// â”€â”€ Main BattleStation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function BattleStation({ agentId, agentName }: BattleStationProps) {
   const [currentLead,   setCurrentLead]   = useState<Lead | null>(null);
   const [callLogId,     setCallLogId]     = useState('');
@@ -242,7 +242,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
   const heartbeatRef    = useRef<ReturnType<typeof setInterval> | null>(null);
   const objectionCooldown = useRef(false);
 
-  // ── Register + heartbeat ──────────────────────────────────────────────────
+  // â”€â”€ Register + heartbeat â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     fetch('/api/agents/register', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -266,7 +266,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
     };
   }, [agentId, agentName]);
 
-  // ── Objection → battle card ────────────────────────────────────────────────
+  // â”€â”€ Objection â†’ battle card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const onObjectionDetected = useCallback(async (text: string) => {
     if (objectionCooldown.current || !currentLead) return;
     objectionCooldown.current = true;
@@ -279,12 +279,12 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
       });
       const card = await res.json();
       setBattleCard(card);
-      toast('⚡ Battle card ready', { icon: '🧠' });
+      toast('âš¡ Battle card ready', { icon: 'ðŸ§ ' });
     } catch { toast.error('AI coach unavailable'); }
     finally { setCardLoading(false); }
   }, [currentLead]);
 
-  // ── Transcript ────────────────────────────────────────────────────────────
+  // â”€â”€ Transcript â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const onTranscriptUpdate = useCallback(async (entries: { speaker: string; text: string; timestamp: string }[]) => {
     if (!callLogId || !entries.length) return;
     const last = entries[entries.length - 1];
@@ -300,7 +300,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
 
   const { videoRef, error: cameraError } = useAgentMirror();
 
-  // ── SignalWire device ─────────────────────────────────────────────────────
+  // â”€â”€ SignalWire device â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const { state: callState, duration, callSid, makeCall, hangUp, mute, reinit } = useSignalWireDevice({
   agentId,
 
@@ -332,7 +332,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
     }
 
     startTranscript();
-    toast.success('📞 Connected');
+    toast.success('ðŸ“ž Connected');
   },
 
   onCallDisconnected: () => {
@@ -347,7 +347,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
   onError: (err: Error) => toast.error(`SignalWire: ${err.message}`),
 });
 
-  // ── Fetch next lead ───────────────────────────────────────────────────────
+  // â”€â”€ Fetch next lead â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fetchNextLead = useCallback(async () => {
     setFetchingLead(true);
     try {
@@ -361,10 +361,10 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
         setCallLogId('');
         clearTranscript();
         setBattleCard(null);
-        toast.success(`🎯 ${data.lead.businessName}`);
+        toast.success(`ðŸŽ¯ ${data.lead.businessName}`);
         return data.lead;
       } else {
-        toast(data.message ?? 'Queue empty — check back shortly.', { icon: '⏳' });
+        toast(data.message ?? 'Queue empty â€” check back shortly.', { icon: 'â³' });
         return null;
       }
     } catch {
@@ -375,24 +375,24 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
     }
   }, [agentId, clearTranscript]);
 
-  // ── Auto-advance after disposition ───────────────────────────────────────
+  // â”€â”€ Auto-advance after disposition â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const onDisposed = useCallback(async (action: DispositionAction, squareUrl?: string) => {
     if (action === 'SUCCESS' && squareUrl) {
       window.open(squareUrl, '_blank');
-      toast.success('💰 Payment link opened!');
+      toast.success('ðŸ’° Payment link opened!');
     }
     setCurrentLead(null);
     setBattleCard(null);
     setCallLogId('');
     clearTranscript();
 
-    // Auto-advance — only if not on call
+    // Auto-advance â€” only if not on call
     const onCall = callState === 'in-call' || callState === 'ringing' || callState === 'connecting';
     if (!onCall) {
       setTimeout(async () => {
         const next = await fetchNextLead();
         if (!next) {
-          // Queue empty — keep UI as is, don't blank
+          // Queue empty â€” keep UI as is, don't blank
         }
       }, 500);
     }
@@ -412,7 +412,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
         <EmailModal lead={currentLead} agentName={agentName} onClose={() => setShowEmail(false)} />
       )}
 
-      {/* ── LEFT: Mirror + Softphone ─────────────────────────────────────── */}
+      {/* â”€â”€ LEFT: Mirror + Softphone â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="w-72 flex flex-col gap-4 flex-shrink-0">
         <Card header={<><Video size={12} /> Agent Mirror</>} noPadding>
           <div className="relative bg-black aspect-video overflow-hidden">
@@ -453,17 +453,17 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
                 {/* All editable lead fields */}
                 <div className="space-y-1 bg-gray-900 rounded-lg p-2">
                   <InlineEdit leadId={currentLead.id} field="businessName" value={currentLead.businessName}
-                    placeholder="Business name" icon="🏢" />
+                    placeholder="Business name" icon="ðŸ¢" />
                   <InlineEdit leadId={currentLead.id} field="contactName" value={currentLead.contactName}
-                    placeholder="Contact name" icon="👤" />
+                    placeholder="Contact name" icon="ðŸ‘¤" />
                   <InlineEdit leadId={currentLead.id} field="phone" value={currentLead.phone}
-                    placeholder="Primary phone" icon="📞" />
+                    placeholder="Primary phone" icon="ðŸ“ž" />
                   <InlineEdit leadId={currentLead.id} field="phone2" value={currentLead.phone2}
-                    placeholder="Add 2nd phone" icon="📱" />
+                    placeholder="Add 2nd phone" icon="ðŸ“±" />
                   <InlineEdit leadId={currentLead.id} field="email" value={currentLead.email}
-                    placeholder="Add email" icon="✉️" />
+                    placeholder="Add email" icon="âœ‰ï¸" />
                   <InlineEdit leadId={currentLead.id} field="address" value={(currentLead as Lead & { address?: string }).address}
-                    placeholder="Add address" icon="📍" />
+                    placeholder="Add address" icon="ðŸ“" />
                 </div>
 
                 {/* Email demo link button */}
@@ -476,10 +476,10 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
                 <div className="text-center text-muted text-xs">No lead loaded</div>
                 <div className="bg-gray-900 rounded-lg p-2.5 space-y-1.5 text-[10px] text-gray-600">
                   <div className="text-gray-500 font-bold uppercase tracking-widest mb-1">Queue is empty if:</div>
-                  <div>• No campaign is Active in /supervisor</div>
-                  <div>• No leads imported yet (CSV import)</div>
-                  <div>• Outside campaign calling hours</div>
-                  <div>• All leads exhausted or closed</div>
+                  <div>â€¢ No campaign is Active in /supervisor</div>
+                  <div>â€¢ No leads imported yet (CSV import)</div>
+                  <div>â€¢ Outside campaign calling hours</div>
+                  <div>â€¢ All leads exhausted or closed</div>
                 </div>
               </div>
             )}
@@ -519,7 +519,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
           header={
             <div className="flex items-center gap-2 w-full">
               <Mic size={12} />
-              <span>{isListening ? 'Listening…' : 'Transcript'}</span>
+              <span>{isListening ? 'Listeningâ€¦' : 'Transcript'}</span>
               {isListening && (
                 <div className="ml-auto flex gap-[2px] items-center h-3">
                   {[0,1,2].map(i => (
@@ -534,7 +534,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
         >
           <div className="h-36 overflow-y-auto space-y-1.5 pr-1">
             {transcript.length === 0 ? (
-              <p className="text-muted text-xs">Transcript appears here during a live call…</p>
+              <p className="text-muted text-xs">Transcript appears here during a live callâ€¦</p>
             ) : transcript.slice(-25).map((e, i) => (
               <div key={i} className={`text-xs rounded px-2 py-1 leading-snug ${
                 e.speaker === 'agent' ? 'bg-accent/10 text-accent/90 ml-6' : 'bg-white/5 text-white/80 mr-6'
@@ -549,14 +549,14 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
         </Card>
       </div>
 
-      {/* ── MIDDLE: Battle Cards + Disposition + Prospect Panel ──────────── */}
+      {/* â”€â”€ MIDDLE: Battle Cards + Disposition + Prospect Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="w-72 flex flex-col gap-4 flex-shrink-0">
         <Card header={<><Zap size={12} /> AI Battle Cards</>} className="flex-1 overflow-y-auto">
           <BattleCardDisplay card={battleCard} loading={cardLoading} />
         </Card>
 
         {currentLead && (
-          <Card header="📋 Disposition" noPadding>
+          <Card header="ðŸ“‹ Disposition" noPadding>
             <div className="p-3">
               <DispositionSelector
                 lead={currentLead}
@@ -583,7 +583,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
         )}
       </div>
 
-      {/* ── RIGHT: Live Prospect View ─────────────────────────────────────── */}
+      {/* â”€â”€ RIGHT: Live Prospect View â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="flex-1 flex flex-col min-w-0">
         <Card
           header={
@@ -591,7 +591,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
               <span className="flex items-center gap-1.5">
                 {currentLead?.sessionId
                   ? <><div className="w-1.5 h-1.5 rounded-full bg-neon animate-pulse" /> Live Prospect View</>
-                  : <>👁 Prospect View</>
+                  : <>ðŸ‘ Prospect View</>
                 }
               </span>
               {currentLead?.sessionId && (
@@ -601,7 +601,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
                   rel="noopener noreferrer"
                   className="text-[10px] text-accent hover:text-white uppercase tracking-widest font-bold transition"
                 >
-                  Open in tab ↗
+                  Open in tab â†—
                 </a>
               )}
             </div>
@@ -614,12 +614,12 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
               key={currentLead.sessionId ?? currentLead.kgmid}
               src={`${process.env.NEXT_PUBLIC_APP_URL ?? ''}/unlock?place_id=${encodeURIComponent(currentLead.kgmid)}${currentLead.sessionId ? `&sessionId=${encodeURIComponent(currentLead.sessionId)}` : ''}&agent_preview=true`}
               className="w-full h-full border-0"
-              title={`${currentLead.businessName} — Prospect View`}
+              title={`${currentLead.businessName} â€” Prospect View`}
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
             />
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-muted gap-5 p-8">
-              <div className="text-6xl opacity-10">📋</div>
+              <div className="text-6xl opacity-10">ðŸ“‹</div>
               <div className="text-center space-y-1">
                 <div className="text-sm text-white/50 font-rajdhani font-bold tracking-widest uppercase">
                   Ready to Dial
@@ -634,10 +634,10 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
                   If queue stays empty:
                 </div>
                 {[
-                  { icon: '📢', text: 'Go to /supervisor → activate a campaign' },
-                  { icon: '📥', text: 'Import a CSV with leads' },
-                  { icon: '🕐', text: 'Check calling hours match lead timezones' },
-                  { icon: '✅', text: 'Verify leads are status: NEW in Firestore' },
+                  { icon: 'ðŸ“¢', text: 'Go to /supervisor â†’ activate a campaign' },
+                  { icon: 'ðŸ“¥', text: 'Import a CSV with leads' },
+                  { icon: 'ðŸ•', text: 'Check calling hours match lead timezones' },
+                  { icon: 'âœ…', text: 'Verify leads are status: NEW in Firestore' },
                 ].map(({ icon, text }) => (
                   <div key={text} className="flex items-start gap-2 text-xs text-gray-500">
                     <span className="text-base leading-none">{icon}</span>
@@ -653,7 +653,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
           )}
         </Card>
       </div>
-      </div>
     </div>
   );
 }
+

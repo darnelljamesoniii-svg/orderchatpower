@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { TranscriptEntry } from '@/types';
@@ -38,15 +38,15 @@ export function useSpeechTranscription({ onTranscript, onObjection }: UseSpeechT
 
   const start = useCallback(() => {
     if (typeof window === 'undefined') return;
-    const SpeechRecognition = window.SpeechRecognition || (window as unknown as { webkitSpeechRecognition: typeof SpeechRecognition }).webkitSpeechRecognition;
-    if (!SpeechRecognition) { console.warn('Speech recognition not supported'); return; }
+    const SpeechRecognitionCtor: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionCtor) { console.warn('Speech recognition not supported'); return; }
 
-    const recognition = new SpeechRecognition();
+    const recognition = new SpeechRecognitionCtor();
     recognition.continuous    = true;
     recognition.interimResults = false;
     recognition.lang           = 'en-US';
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    recognition.onresult = (event: any) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
           addEntry(event.results[i][0].transcript.trim(), 'lead');
@@ -54,7 +54,7 @@ export function useSpeechTranscription({ onTranscript, onObjection }: UseSpeechT
       }
     };
 
-    recognition.onerror = (e: SpeechRecognitionErrorEvent) => {
+    recognition.onerror = (e: { error?: string } & any) => {
       if (e.error !== 'no-speech') console.error('Speech error:', e.error);
     };
 

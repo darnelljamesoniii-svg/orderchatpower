@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import * as Flex from '@twilio/flex-ui';
 
 export const DialerDashboard = () => {
   const [cities, setCities] = useState('Brunswick GA, Savannah GA, Hilton Head SC, Charleston SC');
@@ -43,7 +42,7 @@ export const DialerDashboard = () => {
   };
 
   return (
-    <Flex.Column style={{ padding: 24, background: '#111', color: '#0f0', fontFamily: 'monospace' }}>
+    <div style={{ padding: 24, background: '#111', color: '#0f0', fontFamily: 'monospace' }}>
       <h1 style={{ color: '#0f0' }}>3-CLICK DIALER</h1>
 
       <input
@@ -98,6 +97,6 @@ export const DialerDashboard = () => {
       >
         2. DIAL LIKE A MOTHERFUCKA
       </button>
-    </Flex.Column>
+    </div>
   );
 };

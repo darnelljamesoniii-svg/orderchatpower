@@ -1,6 +1,6 @@
-import { cn, getStatusColor } from '@/lib/utils';
+﻿import { cn, getStatusColor } from '@/lib/utils';
 
-// ── Badge ─────────────────────────────────────────────────────────────────────
+// â”€â”€ Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface BadgeProps {
   status: string;
   label?: string;
@@ -19,9 +19,9 @@ export function StatusBadge({ status, label, className }: BadgeProps) {
   );
 }
 
-// ── Card ──────────────────────────────────────────────────────────────────────
+// â”€â”€ Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface CardProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   className?: string;
   header?:    React.ReactNode;
   noPadding?: boolean;
@@ -42,7 +42,7 @@ export function Card({ children, className, header, noPadding }: CardProps) {
   );
 }
 
-// ── Metric Tile ───────────────────────────────────────────────────────────────
+// â”€â”€ Metric Tile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface MetricProps {
   value:    string | number;
   label:    string;
@@ -60,7 +60,7 @@ export function MetricTile({ value, label, color = 'text-white', sublabel }: Met
   );
 }
 
-// ── Divider ───────────────────────────────────────────────────────────────────
+// â”€â”€ Divider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function Divider({ label }: { label?: string }) {
   return (
     <div className="flex items-center gap-3 my-3">
@@ -70,3 +70,4 @@ export function Divider({ label }: { label?: string }) {
     </div>
   );
 }
+
