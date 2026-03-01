@@ -10,13 +10,14 @@ import { formatDuration, formatCurrency } from '@/lib/utils';
 import { Activity, TrendingUp, Phone, DollarSign, Users } from 'lucide-react';
 
 function AgentStatusDot({ status }: { status: Agent['status'] }) {
-  const map = {
+  const map: Record<Agent['status'], string> = {
     ON_CALL:   'bg-neon animate-pulseGlow',
     AVAILABLE: 'bg-accent',
+    BUSY:      'bg-amber',
     PAUSED:    'bg-amber',
     OFFLINE:   'bg-muted',
   };
-  return <div className={`w-2 h-2 rounded-full flex-shrink-0 ${map[status]}`} />;
+  return <div className={`w-2 h-2 rounded-full flex-shrink-0 ${map[status] ?? 'bg-muted'}`} />;
 }
 
 export default function LiveFeed() {
