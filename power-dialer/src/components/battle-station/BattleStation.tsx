@@ -561,15 +561,38 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
         )}
       </div>
 
-      {/* ── RIGHT: Concierge iFrame ───────────────────────────────────────── */}
+      {/* ── RIGHT: Live Prospect View ─────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
-        <Card header="🔍 Concierge Preview" noPadding className="flex-1 overflow-hidden">
+        <Card
+          header={
+            <div className="flex items-center justify-between w-full">
+              <span className="flex items-center gap-1.5">
+                {currentLead?.sessionId
+                  ? <><div className="w-1.5 h-1.5 rounded-full bg-neon animate-pulse" /> Live Prospect View</>
+                  : <>👁 Prospect View</>
+                }
+              </span>
+              {currentLead?.sessionId && (
+                <a
+                  href={`${process.env.NEXT_PUBLIC_APP_URL ?? ''}/unlock?place_id=${encodeURIComponent(currentLead.kgmid)}&sessionId=${encodeURIComponent(currentLead.sessionId)}&agent_preview=true`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-accent hover:text-white uppercase tracking-widest font-bold transition"
+                >
+                  Open in tab ↗
+                </a>
+              )}
+            </div>
+          }
+          noPadding
+          className="flex-1 overflow-hidden"
+        >
           {currentLead ? (
             <iframe
-              key={currentLead.kgmid}
-              src={`${process.env.NEXT_PUBLIC_APP_URL ?? ''}/concierge?place_id=${encodeURIComponent(currentLead.kgmid)}&demo=true`}
+              key={currentLead.sessionId ?? currentLead.kgmid}
+              src={`${process.env.NEXT_PUBLIC_APP_URL ?? ''}/unlock?place_id=${encodeURIComponent(currentLead.kgmid)}${currentLead.sessionId ? `&sessionId=${encodeURIComponent(currentLead.sessionId)}` : ''}&agent_preview=true`}
               className="w-full h-full border-0"
-              title={`Concierge — ${currentLead.businessName}`}
+              title={`${currentLead.businessName} — Prospect View`}
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
             />
           ) : (
@@ -580,11 +603,10 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
                   Ready to Dial
                 </div>
                 <div className="text-xs text-muted">
-                  Click below to load your first lead.
+                  Load a lead to preview their unlock page.
                 </div>
               </div>
 
-              {/* Why is queue empty checklist */}
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 w-full max-w-xs space-y-2">
                 <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-2">
                   If queue stays empty:
@@ -608,6 +630,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
             </div>
           )}
         </Card>
+      </div>
       </div>
     </div>
   );
