@@ -72,7 +72,7 @@ export interface CampaignWave {
 export interface Agent {
   id:               string;
   name:             string;
-  status:           'AVAILABLE' | 'ON_CALL' | 'OFFLINE' | 'BUSY' | "PAUSED';
+  status: 'AVAILABLE' | 'ON_CALL' | 'OFFLINE' | 'BUSY' | 'PAUSED';
   currentLeadId?:   string | null;
   callsToday:       number;
   revenueToday:     number;
