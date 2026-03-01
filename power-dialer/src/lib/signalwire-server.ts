@@ -35,7 +35,7 @@ export async function sendPaymentSms(toNumber: string, paymentUrl: string, busin
   await swClient.messages.create({
     from: fromNumber,
     to:   toNumber,
-    body: `Hi ${businessName}! Here is your secure payment link: ${paymentUrl} — Thank you for choosing AgenticLife!`,
+    body: `Hi ${businessName}! Here is your secure payment link: ${paymentUrl} â€” Thank you for choosing AgenticLife!`,
   });
 }
 
