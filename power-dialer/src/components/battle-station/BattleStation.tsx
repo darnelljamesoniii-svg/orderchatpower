@@ -302,28 +302,50 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
 
   // ── SignalWire device ─────────────────────────────────────────────────────
   const { state: callState, duration, callSid, makeCall, hangUp, mute, reinit } = useSignalWireDevice({
-    agentId,
-    onCallConnected: async (call) => {
-      try {
-        const res  = await fetch('/api/leads/calllog', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ leadId: currentLead?.id, agentId, callSid: call.parameters?.CallSid ?? callSid }),
-        });
-        const data = await res.json();
-        if (data.callLogId) setCallLogId(data.callLogId);
-      } catch { console.error('Failed to create call log'); }
-      startTranscript();
-      toast.success('📞 Connected');
-    },
-    onCallDisconnected: () => {
-      stopTranscript();
-      fetch('/api/agents/heartbeat', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agentId, status: 'AVAILABLE' }),
-      }).catch(() => {});
-    },
-    onError: (err) => toast.error(`SignalWire: ${err.message}`),
-  });
+  agentId,
+
+  onCallConnected: async (payload: any) => {
+    try {
+      // support both shapes:
+      // - browser SDK: payload.parameters.CallSid
+      // - server-call: payload.callSid
+      const sid =
+        payload?.parameters?.CallSid ??
+        payload?.callSid ??
+        callSid ??
+        null;
+
+      const res = await fetch('/api/leads/calllog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: currentLead?.id,
+          agentId,
+          callSid: sid,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.callLogId) setCallLogId(data.callLogId);
+    } catch {
+      console.error('Failed to create call log');
+    }
+
+    startTranscript();
+    toast.success('📞 Connected');
+  },
+
+  onCallDisconnected: () => {
+    stopTranscript();
+    fetch('/api/agents/heartbeat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agentId, status: 'AVAILABLE' }),
+    }).catch(() => {});
+  },
+
+  onError: (err: Error) => toast.error(`SignalWire: ${err.message}`),
+});
 
   // ── Fetch next lead ───────────────────────────────────────────────────────
   const fetchNextLead = useCallback(async () => {
