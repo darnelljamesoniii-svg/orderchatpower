@@ -48,6 +48,8 @@ export function DispositionSelector({ lead, agentId, callLogId, onDisposed, disa
           action:           selected.action,
           dispositionLabel: selected.label,
           recallAt:         selected.action === 'RECALL' ? recallAt : undefined,
+          callbackDueAt:    selected.action === 'RECALL' ? recallAt : undefined,
+          callbackNote:     selected.action === 'RECALL' ? notes : undefined,
           notes,
           squareAmount:     19900, // $199
         }),
@@ -101,7 +103,7 @@ export function DispositionSelector({ lead, agentId, callLogId, onDisposed, disa
       {selected?.action === 'RECALL' && (
         <div className="animate-slideUp">
           <label className="block text-[10px] tracking-widest uppercase text-muted mb-1">
-            Schedule Recall At
+            Schedule Callback (date + time)
           </label>
           <input
             type="datetime-local"

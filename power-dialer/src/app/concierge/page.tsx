@@ -317,10 +317,7 @@ export default function ConciergePage() {
       }, 400);
 
     } else if (step === 5) {
-      next.cuisine = value
-  .replace(/\p{Extended_Pictographic}/gu, '')
-  .replace(/[\uFE0E\uFE0F]/g, '')
-  .trim();
+      next.cuisine = value.replace(/\s*[\u{1F000}-\u{FFFF}]/gu, '').trim();
       setAnswers(next);
       setTimeout(() => {
         addBot('Anything to keep in mind?', DIETARY_OPTIONS);
@@ -328,10 +325,7 @@ export default function ConciergePage() {
       }, 400);
 
     } else if (step === 6) {
-      next.dietary = value
-  .replace(/\p{Extended_Pictographic}/gu, '')
-  .replace(/[\uFE0E\uFE0F]/g, '')
-  .trim();
+      next.dietary = value.replace(/\s*[\u{1F000}-\u{FFFF}]/gu, '').trim();
       setAnswers(next);
       setTimeout(() => {
         addBot('Last one — what\'s the vibe tonight?', VIBE_OPTIONS);
@@ -339,10 +333,7 @@ export default function ConciergePage() {
       }, 400);
 
     } else if (step === 7) {
-      value
-  .replace(/\p{Extended_Pictographic}/gu, '')
-  .replace(/[\uFE0E\uFE0F]/g, '')
-  .trim();
+      next.vibe = value.replace(/\s*[\u{1F000}-\u{FFFF}]/gu, '').trim();
       setAnswers(next);
       setStep(8);
 

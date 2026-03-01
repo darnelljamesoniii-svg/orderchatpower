@@ -1,14 +1,46 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import Papa from 'papaparse';
+import { db } from '@/lib/firebase';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { COLLECTIONS } from '@/lib/collections';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Upload, FileText, CheckCircle, AlertTriangle, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { CsvRow } from '@/lib/importer';
+import type { CampaignWave } from '@/types';
 
 const EXPECTED_COLUMNS = ['businessName', 'contactName', 'phone', 'kgmid', 'timezone', 'utcOffsetHours'];
+
+// Flexible column name aliases — handles messy real-world CSV headers
+const COLUMN_ALIASES: Record<string, string[]> = {
+  businessName:   ['businessName', 'business_name', 'Business Name', 'name', 'business'],
+  contactName:    ['contactName', 'contact_name', 'Contact Name', 'contact', 'owner'],
+  phone:          ['phone', 'Phone', 'phone_number', 'PHONE', 'Phone Number', 'primary_phone'],
+  phone2:         ['phone2', 'Phone2', 'phone_2', 'secondary_phone', 'alt_phone', 'alternate_phone'],
+  email:          ['email', 'Email', 'EMAIL', 'email_address'],
+  kgmid:          ['kgmid', 'place_id', 'placeId', 'google_place_id', 'KGMID'],
+  timezone:       ['timezone', 'Timezone', 'time_zone', 'tz'],
+  utcOffsetHours: ['utcOffsetHours', 'utc_offset', 'utcOffset', 'utc_offset_hours', 'offset'],
+  address:        ['address', 'Address', 'full_address', 'street_address', 'location'],
+};
+
+function resolveRow(r: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [canonical, aliases] of Object.entries(COLUMN_ALIASES)) {
+    for (const alias of aliases) {
+      if (r[alias] !== undefined) { out[canonical] = r[alias]; break; }
+    }
+  }
+  return out;
+}
+
+function checkMissingColumns(r: Record<string, string>): string[] {
+  const resolved = resolveRow(r);
+  return EXPECTED_COLUMNS.filter(c => !resolved[c]);
+}
 
 interface ImportResult {
   imported:   number;
@@ -22,8 +54,20 @@ export default function CsvImporter() {
   const [preview,  setPreview]  = useState<CsvRow[]>([]);
   const [result,   setResult]   = useState<ImportResult | null>(null);
   const [loading,  setLoading]  = useState(false);
-  const [campaign, setCampaign] = useState<'wave1' | 'wave2'>('wave1');
+  const [campaign, setCampaign] = useState<string>('');
+  const [campaigns, setCampaigns] = useState<CampaignWave[]>([]);
   const [error,    setError]    = useState<string | null>(null);
+
+  // Load campaigns from Firestore — supervisor picks one before importing
+  useEffect(() => {
+    const q = query(collection(db, COLLECTIONS.CAMPAIGNS), orderBy('name'));
+    return onSnapshot(q, snap => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as CampaignWave));
+      setCampaigns(list);
+      // Auto-select first campaign if none selected yet
+      if (!campaign && list.length > 0) setCampaign(list[0].id);
+    });
+  }, []);
 
   const onFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -36,23 +80,26 @@ export default function CsvImporter() {
       header:       true,
       skipEmptyLines: true,
       complete: (results) => {
-        const headers = Object.keys(results.data[0] ?? {});
-        const missing = EXPECTED_COLUMNS.filter(c => !headers.includes(c));
+        const missing = checkMissingColumns(results.data[0] ?? {});
         if (missing.length > 0) {
-          setError(`Missing columns: ${missing.join(', ')}`);
+          setError(`Missing required columns: ${missing.join(', ')}. Check the template for accepted column names.`);
           return;
         }
-        const rows = results.data.slice(0, 5).map(r => ({
-          businessName:   r.businessName,
-          contactName:    r.contactName,
-          phone:          r.phone,
-          email:          r.email,
-          kgmid:          r.kgmid,
-          timezone:       r.timezone,
-          utcOffsetHours: Number(r.utcOffsetHours),
-          campaign,
-          address:        r.address,
-        })) as CsvRow[];
+        const rows = results.data.slice(0, 5).map(r => {
+          const m = resolveRow(r);
+          return {
+            businessName:   m.businessName,
+            contactName:    m.contactName,
+            phone:          m.phone,
+            phone2:         m.phone2,
+            email:          m.email,
+            kgmid:          m.kgmid,
+            timezone:       m.timezone,
+            utcOffsetHours: Number(m.utcOffsetHours),
+            campaign,
+            address:        m.address,
+          };
+        }) as CsvRow[];
         setPreview(rows);
       },
     });
@@ -67,17 +114,21 @@ export default function CsvImporter() {
       header: true,
       skipEmptyLines: true,
       complete: async (results) => {
-        const rows = results.data.map(r => ({
-          businessName:   r.businessName,
-          contactName:    r.contactName,
-          phone:          r.phone,
-          email:          r.email,
-          kgmid:          r.kgmid,
-          timezone:       r.timezone,
-          utcOffsetHours: Number(r.utcOffsetHours),
-          campaign,
-          address:        r.address,
-        })) as CsvRow[];
+        const rows = results.data.map(r => {
+          const m = resolveRow(r);
+          return {
+            businessName:   m.businessName,
+            contactName:    m.contactName,
+            phone:          m.phone,
+            phone2:         m.phone2,
+            email:          m.email,
+            kgmid:          m.kgmid,
+            timezone:       m.timezone,
+            utcOffsetHours: Number(m.utcOffsetHours),
+            campaign,
+            address:        m.address,
+          };
+        }) as CsvRow[];
 
         try {
           const res = await fetch('/api/leads/import', {
@@ -109,21 +160,28 @@ export default function CsvImporter() {
   return (
     <Card header={<><Upload size={12} /> Lead Importer (CSV)</>} noPadding>
       <div className="p-4 space-y-4">
-        {/* Campaign selector */}
-        <div className="flex gap-2">
-          {(['wave1', 'wave2'] as const).map(w => (
-            <button
-              key={w}
-              onClick={() => setCampaign(w)}
-              className={`flex-1 py-1.5 rounded border text-[11px] font-rajdhani font-bold tracking-widest uppercase transition-all ${
-                campaign === w
-                  ? 'bg-accent/20 border-accent/50 text-accent'
-                  : 'bg-card border-border text-muted hover:text-white'
-              }`}
+        {/* Campaign selector — dynamic from Firestore */}
+        <div>
+          <label className="text-[10px] text-muted uppercase tracking-widest block mb-1.5 font-bold">
+            Assign to Campaign
+          </label>
+          {campaigns.length === 0 ? (
+            <div className="text-xs text-muted py-2">
+              No campaigns yet — create one in the Campaigns panel first.
+            </div>
+          ) : (
+            <select
+              value={campaign}
+              onChange={e => setCampaign(e.target.value)}
+              className="w-full bg-card border border-border rounded px-2.5 py-2 text-sm text-white focus:outline-none focus:border-accent"
             >
-              {w === 'wave1' ? 'Wave 1 — General' : 'Wave 2 — Pizza'}
-            </button>
-          ))}
+              {campaigns.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.name}{c.isActive ? ' ✓ Active' : ''}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Drop zone */}
@@ -213,7 +271,7 @@ export default function CsvImporter() {
 
         {file && !error && !result && (
           <Button variant="primary" size="lg" className="w-full" loading={loading} onClick={handleImport}>
-            <Upload size={14} /> Import {campaign === 'wave1' ? 'Wave 1' : 'Wave 2'} Leads
+            <Upload size={14} /> Import to {campaigns.find(c => c.id === campaign)?.name ?? campaign}
           </Button>
         )}
       </div>

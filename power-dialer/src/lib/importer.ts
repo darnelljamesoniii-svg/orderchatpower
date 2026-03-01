@@ -1,18 +1,18 @@
-import 'server-only';
 import { adminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS } from '@/lib/collections';
 import type { Lead } from '@/types';
 
 export interface CsvRow {
-  businessName: string;
-  contactName:  string;
-  phone:        string;
-  email?:       string;
-  address?:     string;
-  kgmid:        string;
-  timezone:     string;
+  businessName:   string;
+  contactName:    string;
+  phone:          string;
+  phone2?:        string;
+  email?:         string;
+  kgmid:          string;
+  timezone:       string;
   utcOffsetHours: number;
-  campaign:     'wave1' | 'wave2';
+  campaign?:      string;  // optional — assigned by supervisor at import time
+  address?:       string;
 }
 
 export interface ImportResult {
@@ -68,14 +68,15 @@ export async function importLeads(rows: CsvRow[]): Promise<ImportResult> {
         businessName:   row.businessName,
         contactName:    row.contactName,
         phone:          normPhone,
-        email:          row.email,
+        phone2:         row.phone2 ?? undefined,
+        email:          row.email ?? undefined,
         kgmid:          row.kgmid,
-        address:        row.address,
+        address:        row.address ?? undefined,
         timezone:       row.timezone,
         utcOffsetHours: Number(row.utcOffsetHours),
         status:         'NEW',
         retryCount:     0,
-        campaign:       row.campaign ?? 'wave1',
+        campaign:       row.campaign ?? 'general',
         createdAt:      now,
         updatedAt:      now,
       };

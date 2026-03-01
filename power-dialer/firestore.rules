@@ -2,38 +2,54 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper: is the request from a signed-in user?
-    function isAuth() {
-      return request.auth != null;
+    function isAuth()             { return request.auth != null; }
+    function isOwner(uid)         { return request.auth.uid == uid; }
+    function isSupervisor()       {
+      return isAuth() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'supervisor';
     }
 
-    // Leads — agents can read/update; only server-side (Admin SDK) can create via import
+    // Users — supervisors manage, reps read own
+    match /users/{uid} {
+      allow read:   if isAuth() && (isOwner(uid) || isSupervisor());
+      allow create: if false; // Admin SDK only (create-user API route)
+      allow update: if isSupervisor();
+      allow delete: if false;
+      allow list:   if isSupervisor();
+    }
+
+    // Leads — agents read/update, only Admin SDK creates
     match /leads/{leadId} {
       allow read:   if isAuth();
       allow update: if isAuth();
-      allow create: if false; // Only via Admin SDK (import endpoint)
+      allow create: if false;
       allow delete: if false;
     }
 
-    // Agents — each agent can write their own doc; supervisors can read all
+    // Agents
     match /agents/{agentId} {
       allow read:  if isAuth();
-      allow write: if isAuth() && (request.auth.uid == agentId || request.auth.token.role == 'supervisor');
+      allow write: if isAuth();
+
+      match /alerts/{alertId} {
+        allow read:   if isAuth() && isOwner(agentId);
+        allow write:  if false;
+        allow list:   if isAuth() && isOwner(agentId);
+        allow delete: if isAuth() && isOwner(agentId);
+      }
     }
 
-    // Dispositions — anyone authenticated can read; supervisors can write
+    // Dispositions + Campaigns
     match /dispositions/{docId} {
       allow read:  if isAuth();
-      allow write: if isAuth(); // tighten to supervisor role in production
+      allow write: if isSupervisor();
     }
-
-    // Campaigns — anyone authenticated can read; supervisors can write
     match /campaigns/{docId} {
       allow read:  if isAuth();
-      allow write: if isAuth(); // tighten to supervisor role in production
+      allow write: if isSupervisor();
     }
 
-    // Call logs — agents can create/read their own logs
+    // Call logs
     match /call_logs/{logId} {
       allow read:   if isAuth();
       allow create: if isAuth();
@@ -41,10 +57,31 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Settings — read-only for agents, write for supervisors
+    // Email logs — read by supervisors only
+    match /email_logs/{logId} {
+      allow read:   if isSupervisor();
+      allow write:  if false;
+    }
+
+    // LP Sessions — public write to own session, agent read
+    match /lp_sessions/{sessionId} {
+      allow create: if request.resource.data.sessionId == sessionId;
+      allow update: if resource.data.sessionId == sessionId;
+      allow list:   if false;
+      allow read:   if isAuth();
+      allow delete: if false;
+    }
+
+    // Settings — supervisor only
     match /settings/{docId} {
       allow read:  if isAuth();
-      allow write: if isAuth();
+      allow write: if isSupervisor();
+    }
+
+    // Zones
+    match /zones/{zoneId} {
+      allow read:  if true;
+      allow write: if false;
     }
   }
 }

@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { PlaceDetails, NearbyPlace } from '@/lib/google-places';
 import type { TierPricing } from '@/lib/pricing';
+import ActivityPulse from './_components/ActivityPulse';
+import { initSession, initReturnVisitDetection, track } from '@/lib/session-tracker';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt(n: number) { return n.toLocaleString('en-US', { maximumFractionDigits: 0 }); }
@@ -29,13 +31,13 @@ function PhotoCarousel({ photos }: { photos: { url: string }[] }) {
 }
 
 // ── Competitor List ───────────────────────────────────────────────────────────
-function CompetitorList({ title, count, items, color }: {
-  title: string; count: number; items: NearbyPlace[]; color: string;
+function CompetitorList({ title, count, items, color, onExpand }: {
+  title: string; count: number; items: NearbyPlace[]; color: string; onExpand?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="border rounded-2xl overflow-hidden" style={{ borderColor: color + '40' }}>
-      <button onClick={() => setOpen(o => !o)}
+      <button onClick={() => { const next = !open; setOpen(next); if (next) onExpand?.(); }}
         className="w-full flex items-center justify-between px-4 py-3 text-left"
         style={{ background: color + '10' }}>
         <div className="flex items-center gap-2">
@@ -172,7 +174,7 @@ function TierCard({ tp, businessPlaceId, business, onLock }: {
         <div className="mt-auto pt-2">
           {tp.autoCheckout ? (
             <button
-              onClick={() => { setLoading(true); onLock(tp); }}
+              onClick={() => { setLoading(true); setPulsesStopped(true); track.lockClicked(tp.tier.id); onLock(tp); }}
               disabled={loading}
               className="w-full py-3 rounded-xl font-bold text-sm tracking-widest uppercase transition-all disabled:opacity-50"
               style={{ background: color, color: '#060810' }}
@@ -285,8 +287,10 @@ const TICKET_OPTIONS = [
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 function UnlockPageContent() {
-  const params  = useSearchParams();
-  const placeId = params.get('place_id');
+  const params    = useSearchParams();
+  const placeId   = params.get('place_id');
+  const sessionId = params.get('sessionId') ?? undefined;
+  const agentId   = params.get('agentId')   ?? undefined;
 
   const [business,      setBusiness]      = useState<PlaceDetails | null>(null);
   const [stingComp,     setStingComp]     = useState<NearbyPlace | null>(null);
@@ -301,7 +305,15 @@ function UnlockPageContent() {
   const [lockedTier,    setLockedTier]    = useState<TierPricing | null>(null);
   const [locking,       setLocking]       = useState(false);
   const [lockSuccess,   setLockSuccess]   = useState(false);
+  const [pulsesStopped, setPulsesStopped] = useState(false);
   const pricingRef = useRef<HTMLDivElement>(null);
+
+  // Init session tracking
+  useEffect(() => {
+    if (!placeId || !sessionId) return;
+    initSession(sessionId, placeId, agentId);
+    initReturnVisitDetection(sessionId, placeId, agentId);
+  }, [placeId, sessionId, agentId]);
 
   // Load competition data
   useEffect(() => {
@@ -354,7 +366,7 @@ function UnlockPageContent() {
         }),
       });
       const { url } = await sqRes.json();
-      if (url) window.open(url, '_blank');
+      if (url) { window.open(url, '_blank'); track.paymentOpened(); setPulsesStopped(true); }
       setLockSuccess(true);
     } catch {
       alert('Something went wrong. Please try again or call us.');
@@ -421,6 +433,14 @@ function UnlockPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
+      {/* Activity Pulse — uses only real competitor data, no fabrication */}
+      {competitors && (
+        <ActivityPulse
+          business={business}
+          competitors={competitors}
+          stopped={pulsesStopped}
+        />
+      )}
       {/* Hero */}
       <div className="bg-gradient-to-b from-gray-900 to-gray-950 border-b border-gray-800 px-4 py-6 text-center">
         <div className="text-xs uppercase tracking-widest text-indigo-400 font-bold mb-1">AgenticLife · Exclusive Territory</div>
@@ -445,7 +465,7 @@ function UnlockPageContent() {
                 competitor={stingComp}
                 business={business}
                 stingMessage={stingMessage}
-                onDone={() => setStingDone(true)}
+                onDone={() => { setStingDone(true); track.stingCompleted(); }}
               />
             ) : (
               <ConciergeDemoFrame />
@@ -460,9 +480,9 @@ function UnlockPageContent() {
               <div>
                 <h2 className="font-bold text-white text-lg mb-3">Your Competitive Landscape</h2>
                 <div className="space-y-3">
-                  <CompetitorList title="Zone 1 — Local Lock" count={counts.tier1} items={competitors.tier1} color="#00d4ff" />
-                  <CompetitorList title="Zone 2 — Neighborhood Control" count={counts.tier2} items={competitors.tier2} color="#8b5cf6" />
-                  <CompetitorList title="Zone 3 — Area Ownership" count={counts.tier3} items={competitors.tier3} color="#f59e0b" />
+                  <CompetitorList title="Zone 1 — Local Lock" count={counts.tier1} items={competitors.tier1} color="#00d4ff" onExpand={() => track.zoneExpanded("tier1")} />
+                  <CompetitorList title="Zone 2 — Neighborhood Control" count={counts.tier2} items={competitors.tier2} color="#8b5cf6" onExpand={() => track.zoneExpanded("tier2")} />
+                  <CompetitorList title="Zone 3 — Area Ownership" count={counts.tier3} items={competitors.tier3} color="#f59e0b" onExpand={() => track.zoneExpanded("tier3")} />
                 </div>
               </div>
             )}
@@ -473,7 +493,7 @@ function UnlockPageContent() {
               <p className="text-gray-400 text-sm mb-4">Pick your average ticket size so we can show you the ROI for each tier.</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
                 {TICKET_OPTIONS.map(t => (
-                  <button key={t.value} onClick={() => setAvgTicket(t.value)}
+                  <button key={t.value} onClick={() => { setAvgTicket(t.value); track.avgTicketSelected(t.value); }}
                     className={`rounded-xl px-3 py-2.5 text-xs font-bold text-center transition-all border ${
                       avgTicket === t.value
                         ? 'bg-indigo-600 border-indigo-500 text-white'

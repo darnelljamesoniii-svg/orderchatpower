@@ -5,7 +5,7 @@ import type { TranscriptEntry } from '@/types';
 
 interface UseSpeechTranscriptionOptions {
   onTranscript?: (entries: TranscriptEntry[]) => void;
-  onObjection?: (text: string) => void;
+  onObjection?:  (text: string) => void;
 }
 
 const OBJECTION_KEYWORDS = [
@@ -14,111 +14,69 @@ const OBJECTION_KEYWORDS = [
   'have someone', 'contract', 'too much', 'happy with',
 ];
 
-export function useSpeechTranscription(
-  { onTranscript, onObjection }: UseSpeechTranscriptionOptions = {}
-) {
-  const recognitionRef = useRef<any>(null);
-  const shouldListenRef = useRef(false);
+export function useSpeechTranscription({ onTranscript, onObjection }: UseSpeechTranscriptionOptions = {}) {
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [isListening, setIsListening]   = useState(false);
+  const [transcript,  setTranscript]    = useState<TranscriptEntry[]>([]);
+  const [lastText,    setLastText]      = useState('');
 
-  const [isListening, setIsListening] = useState(false);
-  const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
-  const [lastText, setLastText] = useState('');
+  const addEntry = useCallback((text: string, speaker: 'agent' | 'lead' = 'lead') => {
+    const entry: TranscriptEntry = { speaker, text, timestamp: new Date().toISOString() };
+    setTranscript(prev => {
+      const next = [...prev, entry];
+      onTranscript?.(next);
+      return next;
+    });
+    setLastText(text);
 
-  const addEntry = useCallback(
-    (text: string, speaker: 'agent' | 'lead' = 'lead') => {
-      const cleaned = String(text || '').trim();
-      if (!cleaned) return;
-
-      const entry: TranscriptEntry = {
-        speaker,
-        text: cleaned,
-        timestamp: new Date().toISOString(),
-      };
-
-      setTranscript((prev) => {
-        const next = [...prev, entry];
-        onTranscript?.(next);
-        return next;
-      });
-
-      setLastText(cleaned);
-
-      const lower = cleaned.toLowerCase();
-      if (OBJECTION_KEYWORDS.some((kw) => lower.includes(kw))) {
-        onObjection?.(cleaned);
-      }
-    },
-    [onTranscript, onObjection]
-  );
+    // Detect objections
+    const lower = text.toLowerCase();
+    if (OBJECTION_KEYWORDS.some(kw => lower.includes(kw))) {
+      onObjection?.(text);
+    }
+  }, [onTranscript, onObjection]);
 
   const start = useCallback(() => {
     if (typeof window === 'undefined') return;
+    const SpeechRecognition = window.SpeechRecognition || (window as unknown as { webkitSpeechRecognition: typeof SpeechRecognition }).webkitSpeechRecognition;
+    if (!SpeechRecognition) { console.warn('Speech recognition not supported'); return; }
 
-    const SpeechRecognitionCtor =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognitionCtor) {
-      console.warn('Speech recognition not supported');
-      return;
-    }
-
-    // If already running, just mark intent and return
-    shouldListenRef.current = true;
-    if (recognitionRef.current) {
-      try { recognitionRef.current.start?.(); } catch {}
-      setIsListening(true);
-      return;
-    }
-
-    const recognition = new SpeechRecognitionCtor();
-    recognition.continuous = true;
+    const recognition = new SpeechRecognition();
+    recognition.continuous    = true;
     recognition.interimResults = false;
-    recognition.lang = 'en-US';
+    recognition.lang           = 'en-US';
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
-          addEntry(event.results[i][0]?.transcript, 'lead');
+          addEntry(event.results[i][0].transcript.trim(), 'lead');
         }
       }
     };
 
-    recognition.onerror = (e: any) => {
-      // no-speech is common noise; ignore it
-      if (e?.error !== 'no-speech') console.error('Speech error:', e?.error ?? e);
+    recognition.onerror = (e: SpeechRecognitionErrorEvent) => {
+      if (e.error !== 'no-speech') console.error('Speech error:', e.error);
     };
 
     recognition.onend = () => {
-      // only restart if user still wants listening
-      if (shouldListenRef.current) {
-        try { recognition.start(); } catch {}
-      }
+      // Auto-restart if still supposed to be listening
+      if (recognitionRef.current) recognition.start();
     };
 
     recognitionRef.current = recognition;
-
-    try { recognition.start(); } catch {}
+    recognition.start();
     setIsListening(true);
   }, [addEntry]);
 
   const stop = useCallback(() => {
-    shouldListenRef.current = false;
-    setIsListening(false);
-
-    try { recognitionRef.current?.stop?.(); } catch {}
+    recognitionRef.current?.stop();
     recognitionRef.current = null;
+    setIsListening(false);
   }, []);
 
   const clear = useCallback(() => setTranscript([]), []);
 
-  useEffect(() => {
-    return () => {
-      // cleanup on unmount
-      shouldListenRef.current = false;
-      try { recognitionRef.current?.stop?.(); } catch {}
-      recognitionRef.current = null;
-    };
-  }, []);
+  useEffect(() => () => { stop(); }, [stop]);
 
   return { isListening, transcript, lastText, start, stop, clear, addEntry };
 }

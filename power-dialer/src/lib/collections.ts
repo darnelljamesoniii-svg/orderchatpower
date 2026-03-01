@@ -6,6 +6,7 @@ export const COLLECTIONS = {
   CAMPAIGNS:    'campaigns',
   CALL_LOGS:    'call_logs',
   SETTINGS:     'settings',
+  USERS:        'users',
 } as const;
 
 // Default dispositions — seeded on first supervisor load
