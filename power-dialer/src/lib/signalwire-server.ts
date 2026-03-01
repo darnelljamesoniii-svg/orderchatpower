@@ -1,17 +1,13 @@
 // ─── SignalWire Server-Side Library ──────────────────────────────────────────
-// SignalWire is Twilio-API-compatible but uses its own SDK and credentials.
-// Project ID + API Token replace Twilio's AccountSID + AuthToken.
-// Space URL replaces api.twilio.com.
+import { createClient } from '@signalwire/node';
 
-import { RestClient } from '@signalwire/node';
-
-const spaceUrl   = process.env.SIGNALWIRE_SPACE_URL!;    // yourspace.signalwire.com
-const projectId  = process.env.SIGNALWIRE_PROJECT_ID!;   // UUID
+const spaceUrl   = process.env.SIGNALWIRE_SPACE_URL!;
+const projectId  = process.env.SIGNALWIRE_PROJECT_ID!;
 const apiToken   = process.env.SIGNALWIRE_REST_API_TOKEN!;
 const fromNumber = process.env.SIGNALWIRE_PHONE_NUMBER!;
 
-// SignalWire REST client — Twilio-compatible API surface
-export const swClient = new RestClient(projectId, apiToken, {
+// SignalWire REST client
+export const swClient = createClient(projectId, apiToken, {
   signalwireSpaceUrl: spaceUrl,
 });
 

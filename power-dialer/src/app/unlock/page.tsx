@@ -102,11 +102,12 @@ function ROIBadge({ roi }: { roi: TierPricing['roi'] }) {
 }
 
 // ── Tier Card ─────────────────────────────────────────────────────────────────
-function TierCard({ tp, businessPlaceId, business, onLock }: {
+function TierCard({ tp, businessPlaceId, business, onLock, onPulseStop }: {
   tp: TierPricing;
   businessPlaceId: string;
   business: PlaceDetails;
   onLock: (tp: TierPricing) => void;
+  onPulseStop: () => void;
 }) {
   const [payOpt, setPayOpt] = useState<'full' | 'afterpay' | 'bailout'>('full');
   const [loading, setLoading] = useState(false);
@@ -174,7 +175,7 @@ function TierCard({ tp, businessPlaceId, business, onLock }: {
         <div className="mt-auto pt-2">
           {tp.autoCheckout ? (
             <button
-              onClick={() => { setLoading(true); setPulsesStopped(true); track.lockClicked(tp.tier.id); onLock(tp); }}
+              onClick={() => { setLoading(true); onPulseStop(); track.lockClicked(tp.tier.id); onLock(tp); }}
               disabled={loading}
               className="w-full py-3 rounded-xl font-bold text-sm tracking-widest uppercase transition-all disabled:opacity-50"
               style={{ background: color, color: '#060810' }}
@@ -515,6 +516,7 @@ function UnlockPageContent() {
                       businessPlaceId={placeId}
                       business={business}
                       onLock={handleLock}
+                      onPulseStop={() => setPulsesStopped(true)}
                     />
                   ))}
                 </div>
