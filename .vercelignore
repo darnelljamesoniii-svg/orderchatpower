@@ -1,0 +1,4 @@
+power-dialer__OLD/
+node_modules/
+.next/
+.env.local
