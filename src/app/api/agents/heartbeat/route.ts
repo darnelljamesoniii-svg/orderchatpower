@@ -30,7 +30,7 @@ export async function POST(req: Request) {
 /**
  * GET: Mark agent offline (called on page unload via navigator.sendBeacon)
  */
-export async function DELETE(req: NextRequest) {
+export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const agentId = searchParams.get('agentId');
