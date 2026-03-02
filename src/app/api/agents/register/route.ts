@@ -1,76 +1,96 @@
-﻿export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+﻿import { NextRequest, NextResponse } from "next/server";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function env(name: string) {
   const v = process.env[name];
-  if (!v) throw new Error('Missing env: ' + name);
+  if (!v) throw new Error("Missing env: " + name);
   return v;
 }
-import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
-import { COLLECTIONS } from '@/lib/collections';
 
-export const dynamic = 'force-dynamic';
-
-function env(name: string) {
-  const v = process.env[name];
-  if (!v) throw new Error('Missing env: ' + name);
-  return v;
-}
-/**
- * Called when an agent opens the Battle Station.
- * Creates the agent document if it doesn't exist, or reactivates it.
- */
 export async function POST(req: NextRequest) {
-  // Lazy imports to prevent Vercel build-time crashes when env/Firebase aren't configured yet
-  const { adminAuth, adminDb } = await import('@/lib/firebase-admin');
-  const { COLLECTIONS } = await import('@/lib/collections');
-  const { sendEmail } = await import('@/lib/resend');
+  const { adminAuth, adminDb } = await import("@/lib/firebase-admin");
+  const { COLLECTIONS } = await import("@/lib/collections");
+  const { sendEmail } = await import("@/lib/resend");
 
   try {
-    const { agentId, agentName } = await req.json();
-    if (!agentId || !agentName) {
-      return NextResponse.json({ error: 'agentId and agentName required' }, { status: 400 });
+    const { email, displayName, role = "rep", supervisorUid, tempPassword } = await req.json();
+
+    if (!email || !displayName || !supervisorUid) {
+      return NextResponse.json({ error: "email, displayName, supervisorUid required" }, { status: 400 });
     }
 
-    const ref  = adminDb.collection(COLLECTIONS.AGENTS).doc(agentId);
-    const snap = await ref.get();
-    const now  = new Date().toISOString();
+    const supervisorSnap = await adminDb.collection(COLLECTIONS.USERS).doc(supervisorUid).get();
+    if (!supervisorSnap.exists || supervisorSnap.data()?.role !== "supervisor") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
 
-    if (!snap.exists) {
-      // First login â€” create fresh doc
-      await ref.set({
-        id:               agentId,
-        name:             agentName,
-        status:           'AVAILABLE',
-        currentLeadId:    null,
-        callsToday:       0,
-        revenueToday:     0,
-        talkTimeSeconds:  0,
-        lastActiveAt:     now,
-        createdAt:        now,
-      });
-    } else {
-      // Re-login â€” reset to available, keep historical counters
-      await ref.update({
-        name:          agentName,
-        status:        'AVAILABLE',
-        currentLeadId: null,
-        lastActiveAt:  now,
+    const password = tempPassword ?? generatePassword();
+
+    const fbUser = await adminAuth.createUser({
+      email,
+      password,
+      displayName,
+      emailVerified: false,
+    });
+
+    const now = new Date().toISOString();
+
+    await adminDb.collection(COLLECTIONS.USERS).doc(fbUser.uid).set({
+      uid: fbUser.uid,
+      email,
+      displayName,
+      role,
+      agentId: fbUser.uid,
+      createdAt: now,
+      createdBy: supervisorUid,
+      active: true,
+    });
+
+    if (role === "rep") {
+      await adminDb.collection(COLLECTIONS.AGENTS).doc(fbUser.uid).set({
+        id: fbUser.uid,
+        name: displayName,
+        email,
+        status: "OFFLINE",
+        callsToday: 0,
+        revenueToday: 0,
+        talkTimeSeconds: 0,
+        createdAt: now,
       });
     }
 
-    return NextResponse.json({ success: true, agentId });
+    let emailSent = false;
+    if (process.env.RESEND_API_KEY) {
+      try {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+        await sendEmail({
+          to: email,
+          subject: "Your AgenticLife Power Dialer account is ready",
+          body: Hi ,\n\nYour account has been created. Here are your login details:\n\nEmail: \nTemp Password: \n\nLogin at: /login\n\nChange your password after your first login.\n\nWelcome to the team!,
+        });
+        emailSent = true;
+      } catch (e) {
+        console.error("[agents/register] Email send failed (non-fatal):", e);
+      }
+    }
+
+    return NextResponse.json({ success: true, uid: fbUser.uid, email, password, emailSent });
   } catch (err: unknown) {
-    console.error('[/api/agents/register]', err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Internal error' },
-      { status: 500 },
-    );
+    console.error("[/api/agents/register]", err);
+    const message = err instanceof Error ? err.message : "Failed to create user";
+    const code = (err as { code?: string }).code;
+    if (code === "auth/email-already-exists") {
+      return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
+    }
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
-
-
-
-
+function generatePassword(): string {
+  const words = ["Rocket","Storm","Blaze","Swift","Force","Apex","Surge","Titan","Pulse","Nova"];
+  const word = words[Math.floor(Math.random() * words.length)];
+  const digits = Math.floor(1000 + Math.random() * 9000);
+  return ${word};
+}
