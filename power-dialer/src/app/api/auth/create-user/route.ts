@@ -1,11 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { adminAuth, adminDb } from '@/lib/firebase-admin';
-import { COLLECTIONS } from '@/lib/collections';
-import { sendEmail } from '@/lib/resend';
-
+﻿import { NextResponse } from 'next/server';
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
+  const { adminAuth, adminDb } = await import('@/lib/firebase-admin');
+  const { COLLECTIONS } = await import('@/lib/collections');
+  const { sendEmail } = await import('@/lib/resend');
   try {
     const {
       email,
@@ -13,7 +12,7 @@ export async function POST(req: NextRequest) {
       role = 'rep',
       supervisorUid,
       tempPassword,
-    } = await req.json();
+    } = await request.json();
 
     if (!email || !displayName || !supervisorUid) {
       return NextResponse.json(
@@ -118,3 +117,4 @@ function generatePassword(): string {
   const digits = Math.floor(1000 + Math.random() * 9000);
   return `${word}${digits}`;
 }
+
