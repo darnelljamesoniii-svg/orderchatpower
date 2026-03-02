@@ -28,6 +28,8 @@ export async function POST(request: Request) {
  * GET: Mark agent offline (called on page unload via navigator.sendBeacon)
  */
 export async function DELETE(request: Request) {
+  const { adminDb } = await import('@/lib/firebase-admin');
+  const { COLLECTIONS } = await import('@/lib/collections');
   try {
     const { searchParams } = new URL(request.url);
     const agentId = searchParams.get('agentId');
@@ -45,6 +47,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
+
 
 
 
