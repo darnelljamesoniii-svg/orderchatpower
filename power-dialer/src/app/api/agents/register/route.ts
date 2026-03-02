@@ -1,14 +1,36 @@
+﻿export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+
+function env(name: string) {
+  const v = process.env[name];
+  if (!v) throw new Error(Missing env: );
+  return v;
+}
+
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS } from '@/lib/collections';
 
 export const dynamic = 'force-dynamic';
 
+
+function env(name: string) {
+  const v = process.env[name];
+  if (!v) throw new Error(Missing env: );
+  return v;
+}
+
 /**
  * Called when an agent opens the Battle Station.
  * Creates the agent document if it doesn't exist, or reactivates it.
  */
 export async function POST(req: NextRequest) {
+  // Lazy imports to prevent Vercel build-time crashes when env/Firebase aren't configured yet
+  const { adminAuth, adminDb } = await import('@/lib/firebase-admin');
+  const { COLLECTIONS } = await import('@/lib/collections');
+  const { sendEmail } = await import('@/lib/resend');
+
   try {
     const { agentId, agentName } = await req.json();
     if (!agentId || !agentName) {
@@ -20,7 +42,7 @@ export async function POST(req: NextRequest) {
     const now  = new Date().toISOString();
 
     if (!snap.exists) {
-      // First login — create fresh doc
+      // First login â€” create fresh doc
       await ref.set({
         id:               agentId,
         name:             agentName,
@@ -33,7 +55,7 @@ export async function POST(req: NextRequest) {
         createdAt:        now,
       });
     } else {
-      // Re-login — reset to available, keep historical counters
+      // Re-login â€” reset to available, keep historical counters
       await ref.update({
         name:          agentName,
         status:        'AVAILABLE',
@@ -51,3 +73,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+
