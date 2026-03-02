@@ -99,6 +99,7 @@ function generatePassword(): string {
   const words = ["Rocket","Storm","Blaze","Swift","Force","Apex","Surge","Titan","Pulse","Nova"];
   const word = words[Math.floor(Math.random() * words.length)];
   const digits = Math.floor(1000 + Math.random() * 9000);
-  return ${word};
+  return word + String(digits);
 }
+
 
