@@ -1,56 +1,43 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { sendEmail } from '@/lib/resend';
-import { adminDb } from '@/lib/firebase-admin';
-import { COLLECTIONS } from '@/lib/collections';
-import { FieldValue } from 'firebase-admin/firestore';
+﻿import { NextResponse } from "next/server";
 
-export const dynamic = 'force-dynamic';
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
+  const { sendEmail } = await import("@/lib/resend");
+  const { adminDb } = await import("@/lib/firebase-admin");
+  const { COLLECTIONS } = await import("@/lib/collections");
+  const { FieldValue } = await import("firebase-admin/firestore");
+
   try {
-    const { to, subject, body, placeId, sessionId, agentId, leadId, callLogId } = await req.json();
+    const { to, subject, body, callLogId, leadId } = await request.json();
 
     if (!to || !subject || !body) {
-      return NextResponse.json({ error: 'to, subject, body required' }, { status: 400 });
+      return NextResponse.json(
+        { error: "to, subject, body required" },
+        { status: 400 }
+      );
     }
 
-    // Send via Resend
-    const result = await sendEmail({ to, subject, body, placeId, sessionId });
+    const result = await sendEmail({ to, subject, body });
 
-    // Log to call_logs if we have a callLogId
     if (callLogId) {
       await adminDb.collection(COLLECTIONS.CALL_LOGS).doc(callLogId).update({
-        emailSentAt: new Date().toISOString(),
-        emailTo:     to,
+        emailSent: true,
+        resendId: result?.id ?? null,
+        updatedAt: FieldValue.serverTimestamp(),
       });
     }
 
-    // Log to lead doc
     if (leadId) {
       await adminDb.collection(COLLECTIONS.LEADS).doc(leadId).update({
-        lastEmailSentAt: new Date().toISOString(),
-        updatedAt:       new Date().toISOString(),
+        lastContactedAt: FieldValue.serverTimestamp(),
       });
     }
 
-    // Log email event to a separate collection for audit trail
-    await adminDb.collection('email_logs').add({
-      resendId:  result.id,
-      to,
-      subject,
-      placeId:   placeId ?? null,
-      sessionId: sessionId ?? null,
-      agentId:   agentId ?? null,
-      leadId:    leadId ?? null,
-      sentAt:    new Date().toISOString(),
-    });
-
-    return NextResponse.json({ success: true, messageId: result.id });
-  } catch (err: unknown) {
-    console.error('[/api/email/send]', err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Email send failed' },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: true, resendId: result?.id ?? null });
+  } catch (err) {
+    console.error("[/api/email/send]", err);
+    return NextResponse.json({ error: "Failed to send email" }, { status: 500 });
   }
 }
