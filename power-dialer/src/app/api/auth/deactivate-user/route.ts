@@ -1,12 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { adminAuth, adminDb } from '@/lib/firebase-admin';
-import { COLLECTIONS } from '@/lib/collections';
-
+﻿import { NextResponse } from 'next/server';
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
+  const { adminAuth, adminDb } = await import('@/lib/firebase-admin');
+  const { COLLECTIONS } = await import('@/lib/collections');
   try {
-    const { targetUid, supervisorUid, active } = await req.json();
+    const { targetUid, supervisorUid, active } = await request.json();
 
     if (!targetUid || !supervisorUid || active === undefined) {
       return NextResponse.json(
@@ -43,3 +42,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
