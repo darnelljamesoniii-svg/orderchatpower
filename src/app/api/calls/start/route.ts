@@ -1,10 +1,10 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase-admin';
+
+export const runtime = 'nodejs';
 const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
 import { swClient, buildOutboundLaML } from '@/lib/signalwire-server';
-
-export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
@@ -38,4 +38,6 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true, callSid: (call as any)?.sid ?? null });
 }
+
+
 

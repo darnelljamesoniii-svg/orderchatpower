@@ -1,11 +1,9 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
-export const runtime = 'nodejs';
+import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase-admin';
+
 export const runtime = 'nodejs';
 const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
-export const runtime = 'nodejs';
-
 export const dynamic = 'force-dynamic';
 
 /**
@@ -72,5 +70,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed' }, { status: 500 });
   }
 }
+
+
 
 

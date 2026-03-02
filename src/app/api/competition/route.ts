@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       getNearbyCompetitors(location, walkMinutesToMetres(20), category, placeId),
     ]);
 
-    // Deduplicate — each tier ring only contains NEW competitors vs previous tier
+    // Deduplicate â€” each tier ring only contains NEW competitors vs previous tier
     const t1Ids = new Set(t1walk.map(p => p.placeId));
     const t2Ids = new Set(t2walk.map(p => p.placeId));
 
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     const tier2  = t2walk.filter(p => !t1Ids.has(p.placeId));
     const tier3  = t3walk.filter(p => !t2Ids.has(p.placeId));
 
-    // Pick "sting" competitor — closest open highest-rated in tier1
+    // Pick "sting" competitor â€” closest open highest-rated in tier1
     const stingCandidate = [...tier1]
       .filter(p => p.openNow !== false)
       .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))[0]
@@ -71,3 +71,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed' }, { status: 500 });
   }
 }
+

@@ -1,13 +1,10 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
-export const runtime = 'nodejs';
+import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase-admin';
+
 export const runtime = 'nodejs';
 const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
-export const runtime = 'nodejs';
 import { validateSignalWireSignature } from '@/lib/signalwire-server';
-export const runtime = 'nodejs';
-
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
@@ -53,7 +50,6 @@ export async function POST(req: NextRequest) {
       // Update agent talk time
       if (logData.agentId && callDuration > 0) {
         const { FieldValue } = await import('firebase-admin/firestore');
-export const runtime = 'nodejs';
         await adminDb.collection(COLLECTIONS.AGENTS).doc(logData.agentId).update({
           talkTimeSeconds: FieldValue.increment(callDuration),
           status:          'AVAILABLE',
@@ -79,5 +75,7 @@ export const runtime = 'nodejs';
     return new NextResponse('OK', { status: 200 });
   }
 }
+
+
 
 

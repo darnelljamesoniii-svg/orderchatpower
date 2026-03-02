@@ -1,13 +1,10 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
-export const runtime = 'nodejs';
+import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase-admin';
+
 export const runtime = 'nodejs';
 const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
-export const runtime = 'nodejs';
 import type { CallLog } from '@/types';
-export const runtime = 'nodejs';
-
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
@@ -54,7 +51,6 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'callLogId, speaker, text required' }, { status: 400 });
     }
     const { FieldValue } = await import('firebase-admin/firestore');
-export const runtime = 'nodejs';
     const entry = { speaker, text, timestamp: new Date().toISOString() };
     await adminDb.collection(COLLECTIONS.CALL_LOGS).doc(callLogId).update({
       transcript: FieldValue.arrayUnion(entry),
@@ -65,5 +61,7 @@ export const runtime = 'nodejs';
     return NextResponse.json({ error: 'Failed to append transcript' }, { status: 500 });
   }
 }
+
+
 
 

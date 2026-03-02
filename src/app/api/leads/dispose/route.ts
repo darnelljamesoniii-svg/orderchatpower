@@ -1,21 +1,14 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
-export const runtime = 'nodejs';
+import { NextRequest, NextResponse } from 'next/server';
 import { applyDisposition } from '@/lib/queue-engine';
-export const runtime = 'nodejs';
 import { getAdminDb } from '@/lib/firebase-admin';
+
 export const runtime = 'nodejs';
 const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
-export const runtime = 'nodejs';
 import { createSquarePaymentLink } from '@/lib/square';
-export const runtime = 'nodejs';
 import { sendPaymentSms } from '@/lib/signalwire-server';
-export const runtime = 'nodejs';
 import { FieldValue } from 'firebase-admin/firestore';
-export const runtime = 'nodejs';
 import type { DispositionPayload } from '@/types';
-export const runtime = 'nodejs';
-
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
@@ -89,5 +82,7 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+
 
 

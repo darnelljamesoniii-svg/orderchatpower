@@ -18,3 +18,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'AI coach unavailable' }, { status: 500 });
   }
 }
+

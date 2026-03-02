@@ -1,14 +1,11 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
-export const runtime = 'nodejs';
+import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin';
+
+export const runtime = 'nodejs';
 const adminAuth = getAdminAuth();
 const adminDb = getAdminDb();
-export const runtime = 'nodejs';
 import { COLLECTIONS } from '@/lib/collections';
-export const runtime = 'nodejs';
 import { sendEmail } from '@/lib/resend';
-export const runtime = 'nodejs';
-
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
@@ -124,5 +121,7 @@ function generatePassword(): string {
   const digits = Math.floor(1000 + Math.random() * 9000);
   return `${word}${digits}`;
 }
+
+
 
 

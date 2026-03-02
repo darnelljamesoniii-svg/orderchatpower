@@ -1,11 +1,9 @@
-﻿import { NextResponse } from 'next/server';
-export const runtime = 'nodejs';
+import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase-admin';
+
 export const runtime = 'nodejs';
 const adminDb = getAdminDb();
 import { COLLECTIONS, DEFAULT_CAMPAIGNS } from '@/lib/collections';
-export const runtime = 'nodejs';
-
 export const dynamic = 'force-dynamic';
 
 export async function POST() {
@@ -33,5 +31,8 @@ export async function POST() {
   await batch.commit();
   return NextResponse.json({ ok: true, seeded: DEFAULT_CAMPAIGNS.map(c => c.id) });
 }
+
+
+
 
 

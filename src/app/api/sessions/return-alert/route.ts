@@ -1,13 +1,10 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
-export const runtime = 'nodejs';
+import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase-admin';
+
 export const runtime = 'nodejs';
 const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
-export const runtime = 'nodejs';
 import { sendEmail } from '@/lib/resend';
-export const runtime = 'nodejs';
-
 export const dynamic = 'force-dynamic';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://agenticlife.com';
@@ -74,5 +71,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Alert failed' }, { status: 500 });
   }
 }
+
+
 
 

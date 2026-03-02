@@ -19,3 +19,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Square error' }, { status: 500 });
   }
 }
+

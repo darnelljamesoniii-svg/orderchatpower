@@ -1,13 +1,10 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
-export const runtime = 'nodejs';
+import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-export const runtime = 'nodejs';
 import { getAdminDb } from '@/lib/firebase-admin';
+
 export const runtime = 'nodejs';
 const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
-export const runtime = 'nodejs';
-
 export const dynamic = 'force-dynamic';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -98,5 +95,7 @@ Provide your analysis as valid JSON only (no markdown, no backticks):
     return NextResponse.json({ error: 'Coaching failed silently' }, { status: 200 });
   }
 }
+
+
 
 

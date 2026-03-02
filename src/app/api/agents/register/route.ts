@@ -1,6 +1,6 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "nodejs";
+export const runtime = 'nodejs';
 export const dynamic = "force-dynamic";
 
 function env(name: string) {
@@ -105,3 +105,5 @@ function generatePassword(): string {
   const digits = Math.floor(1000 + Math.random() * 9000);
   return ${word};
 }
+
+

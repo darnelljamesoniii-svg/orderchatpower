@@ -11,7 +11,7 @@ const apiToken   = process.env.SIGNALWIRE_REST_API_TOKEN!;
  * We return LaML (identical syntax to TwiML) instructing SignalWire how
  * to connect the call.
  *
- * Set this URL in SignalWire Console → Voice API → LaML Webhook:
+ * Set this URL in SignalWire Console â†’ Voice API â†’ LaML Webhook:
  *   https://your-domain.com/api/signalwire/webhook
  */
 export async function POST(req: NextRequest) {
@@ -51,3 +51,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
