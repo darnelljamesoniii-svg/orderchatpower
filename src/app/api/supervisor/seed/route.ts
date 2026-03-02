@@ -1,11 +1,15 @@
-import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
+﻿import { NextResponse } from 'next/server';
+export const runtime = 'nodejs';
+import { getAdminDb } from '@/lib/firebase-admin';
+export const runtime = 'nodejs';
+const adminDb = getAdminDb();
 import { COLLECTIONS, DEFAULT_DISPOSITIONS, DEFAULT_CAMPAIGNS } from '@/lib/collections';
+export const runtime = 'nodejs';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Idempotent seed — safe to call multiple times.
+ * Idempotent seed â€” safe to call multiple times.
  * Seeds dispositions and campaign waves only if they don't already exist.
  * Called automatically by the supervisor page on every load.
  */
@@ -53,3 +57,5 @@ export async function POST() {
     );
   }
 }
+
+

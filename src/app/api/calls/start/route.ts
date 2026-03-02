@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
+﻿import { NextResponse } from 'next/server';
+import { getAdminDb } from '@/lib/firebase-admin';
+const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
 import { swClient, buildOutboundLaML } from '@/lib/signalwire-server';
 
@@ -37,3 +38,4 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true, callSid: (call as any)?.sid ?? null });
 }
+

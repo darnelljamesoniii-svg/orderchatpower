@@ -1,4 +1,5 @@
-import { adminDb } from '@/lib/firebase-admin';
+﻿import { getAdminDb } from '@/lib/firebase-admin';
+const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
 import type { Lead } from '@/types';
 
@@ -11,7 +12,7 @@ export interface CsvRow {
   kgmid:          string;
   timezone:       string;
   utcOffsetHours: number;
-  campaign?:      string;  // optional — assigned by supervisor at import time
+  campaign?:      string;  // optional â€” assigned by supervisor at import time
   address?:       string;
 }
 
@@ -101,3 +102,4 @@ export async function importLeads(rows: CsvRow[]): Promise<ImportResult> {
 
   return result;
 }
+

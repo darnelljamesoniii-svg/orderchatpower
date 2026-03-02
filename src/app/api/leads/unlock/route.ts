@@ -1,6 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
+﻿import { NextRequest, NextResponse } from 'next/server';
+export const runtime = 'nodejs';
+import { getAdminDb } from '@/lib/firebase-admin';
+export const runtime = 'nodejs';
+const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
+export const runtime = 'nodejs';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +20,7 @@ export const dynamic = 'force-dynamic';
  * {
  *   "crons": [{ "path": "/api/leads/unlock", "schedule": "* /2 * * * *" }]
  * }
- * (Note: remove the space in * /2 above — it's there to avoid comment issues)
+ * (Note: remove the space in * /2 above â€” it's there to avoid comment issues)
  */
 export async function GET(req: NextRequest) {
   // Optional: protect with a secret header when called from cron
@@ -68,3 +72,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed' }, { status: 500 });
   }
 }
+
+

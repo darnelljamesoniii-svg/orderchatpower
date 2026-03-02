@@ -1,7 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
+﻿import { NextRequest, NextResponse } from 'next/server';
+export const runtime = 'nodejs';
+import { getAdminDb } from '@/lib/firebase-admin';
+export const runtime = 'nodejs';
+const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
+export const runtime = 'nodejs';
 import { validateSignalWireSignature } from '@/lib/signalwire-server';
+export const runtime = 'nodejs';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +53,7 @@ export async function POST(req: NextRequest) {
       // Update agent talk time
       if (logData.agentId && callDuration > 0) {
         const { FieldValue } = await import('firebase-admin/firestore');
+export const runtime = 'nodejs';
         await adminDb.collection(COLLECTIONS.AGENTS).doc(logData.agentId).update({
           talkTimeSeconds: FieldValue.increment(callDuration),
           status:          'AVAILABLE',
@@ -56,7 +62,7 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // Fire async coaching for calls >= 2 minutes — never blocks this response
+      // Fire async coaching for calls >= 2 minutes â€” never blocks this response
       if (callDuration >= 120 && callStatus === 'completed') {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL;
         fetch(`${appUrl}/api/gemini/call-summary`, {
@@ -73,3 +79,5 @@ export async function POST(req: NextRequest) {
     return new NextResponse('OK', { status: 200 });
   }
 }
+
+

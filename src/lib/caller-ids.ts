@@ -1,8 +1,9 @@
-// ─── Rotating Caller IDs ──────────────────────────────────────────────────────
+﻿// â”€â”€â”€ Rotating Caller IDs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Reads from Firestore settings/caller_ids
 // Uses a transaction to atomically increment the index (true round-robin)
 
-import { adminDb } from '@/lib/firebase-admin';
+import { getAdminDb } from '@/lib/firebase-admin';
+const adminDb = getAdminDb();
 import { FieldValue } from 'firebase-admin/firestore';
 
 const SETTINGS_DOC = 'settings/caller_ids';
@@ -27,7 +28,7 @@ export async function getNextCallerId(): Promise<string> {
     await adminDb.runTransaction(async tx => {
       const snap = await tx.get(ref);
       if (!snap.exists) {
-        // First time — seed with the env var number
+        // First time â€” seed with the env var number
         tx.set(ref, { numbers: [fallback], currentIndex: 0 });
         selected = fallback;
         return;
@@ -86,3 +87,4 @@ export async function getCallerIds(): Promise<CallerIdsSettings> {
   if (!snap.exists) return { numbers: [process.env.SIGNALWIRE_PHONE_NUMBER ?? ''], currentIndex: 0 };
   return snap.data() as CallerIdsSettings;
 }
+

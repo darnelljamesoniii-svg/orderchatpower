@@ -1,7 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
+export const runtime = 'nodejs';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { adminDb } from '@/lib/firebase-admin';
+export const runtime = 'nodejs';
+import { getAdminDb } from '@/lib/firebase-admin';
+export const runtime = 'nodejs';
+const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
+export const runtime = 'nodejs';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,7 +71,7 @@ Provide your analysis as valid JSON only (no markdown, no backticks):
     try {
       parsed = JSON.parse(raw);
     } catch {
-      // Gemini returned non-JSON — store raw
+      // Gemini returned non-JSON â€” store raw
       parsed = {
         summary:      raw.slice(0, 500),
         objections:   [],
@@ -76,7 +81,7 @@ Provide your analysis as valid JSON only (no markdown, no backticks):
       };
     }
 
-    // Write back to call log — never throws, failure is non-fatal
+    // Write back to call log â€” never throws, failure is non-fatal
     await adminDb.collection(COLLECTIONS.CALL_LOGS).doc(callLogId).update({
       summary:      parsed.summary,
       coachingTips: parsed.coachingTips,
@@ -88,8 +93,10 @@ Provide your analysis as valid JSON only (no markdown, no backticks):
 
     return NextResponse.json({ success: true, score: parsed.score });
   } catch (err: unknown) {
-    // Never propagate — this is fire-and-forget
+    // Never propagate â€” this is fire-and-forget
     console.error('[/api/gemini/call-summary]', err);
     return NextResponse.json({ error: 'Coaching failed silently' }, { status: 200 });
   }
 }
+
+

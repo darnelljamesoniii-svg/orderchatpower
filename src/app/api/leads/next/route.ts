@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
+export const runtime = 'nodejs';
 import { getNextLead } from '@/lib/queue-engine';
+export const runtime = 'nodejs';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,3 +24,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

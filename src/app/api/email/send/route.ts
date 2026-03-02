@@ -1,8 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
+export const runtime = 'nodejs';
 import { sendEmail } from '@/lib/resend';
-import { adminDb } from '@/lib/firebase-admin';
+export const runtime = 'nodejs';
+import { getAdminDb } from '@/lib/firebase-admin';
+export const runtime = 'nodejs';
+const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
+export const runtime = 'nodejs';
 import { FieldValue } from 'firebase-admin/firestore';
+export const runtime = 'nodejs';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,3 +60,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+

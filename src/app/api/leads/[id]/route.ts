@@ -3,7 +3,7 @@ import { adminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS } from '@/lib/collections';
 
 export const dynamic = 'force-dynamic';
-
+export const runtime = 'nodejs';
 // PATCH /api/leads/[id]
 // Accepts: { email?, phone2?, notes? }
 // Used by inline edit in BattleStation lead card

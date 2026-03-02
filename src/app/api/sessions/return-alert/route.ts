@@ -1,7 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
+﻿import { NextRequest, NextResponse } from 'next/server';
+export const runtime = 'nodejs';
+import { getAdminDb } from '@/lib/firebase-admin';
+export const runtime = 'nodejs';
+const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
+export const runtime = 'nodejs';
 import { sendEmail } from '@/lib/resend';
+export const runtime = 'nodejs';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +42,7 @@ export async function POST(req: NextRequest) {
     const inHours = isWithinBusinessHours();
 
     if (inHours && ownerId) {
-      // Write alert to agent's subcollection — Battle Station subscribes to this
+      // Write alert to agent's subcollection â€” Battle Station subscribes to this
       await adminDb
         .collection(COLLECTIONS.AGENTS)
         .doc(ownerId)
@@ -46,14 +51,14 @@ export async function POST(req: NextRequest) {
           type:        'return_visit',
           leadId:      leadId ?? null,
           businessName: bizName,
-          message:     `🔥 ${bizName} just returned to their demo page!`,
+          message:     `ðŸ”¥ ${bizName} just returned to their demo page!`,
           placeId,
           sessionId,
           createdAt:   new Date().toISOString(),
           read:        false,
         });
     } else {
-      // Outside hours — email the team
+      // Outside hours â€” email the team
       await sendEmail({
         to:      process.env.EMAIL_REPLY_TO ?? 'team@agenticlife.com',
         subject: `Return visit after hours: ${bizName}`,
@@ -69,3 +74,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Alert failed' }, { status: 500 });
   }
 }
+
+

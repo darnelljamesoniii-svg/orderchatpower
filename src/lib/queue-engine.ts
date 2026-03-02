@@ -1,4 +1,5 @@
-import { adminDb } from '@/lib/firebase-admin';
+﻿import { getAdminDb } from '@/lib/firebase-admin';
+const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
 import { FieldValue } from 'firebase-admin/firestore';
 import { v4 as uuidv4 } from 'uuid';
@@ -35,7 +36,7 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
   const activeCampaigns = campaignSnap.docs.map(d => d.data() as CampaignWave);
   if (!activeCampaigns.length) return { lead: null, queueDepth: 0, message: 'No active campaigns.' };
 
-  // ── Priority 1: Agent-owned callbacks that are due ────────────────────────
+  // â”€â”€ Priority 1: Agent-owned callbacks that are due â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const ownedSnap = await leadsRef
     .where('status', '==', 'CALLBACK_MANUAL')
     .where('ownerAgentId', '==', agentId)
@@ -44,7 +45,7 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
     .limit(5)
     .get();
 
-  // ── Priority 2: Orphaned callbacks (owner offline > 15 min) ──────────────
+  // â”€â”€ Priority 2: Orphaned callbacks (owner offline > 15 min) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const orphanCutoff = new Date(now.getTime() - CALLBACK_FALLBACK_MS).toISOString();
   const orphanSnap   = await leadsRef
     .where('status', '==', 'CALLBACK_MANUAL')
@@ -63,7 +64,7 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
       })
   )).filter(Boolean);
 
-  // ── Priority 3: Auto callbacks ────────────────────────────────────────────
+  // â”€â”€ Priority 3: Auto callbacks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const autoSnap = await leadsRef
     .where('status', '==', 'CALLBACK_AUTO')
     .where('nextAvailableAt', '<=', nowIso)
@@ -71,7 +72,7 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
     .limit(10)
     .get();
 
-  // ── Priority 4: Fresh NEW leads ───────────────────────────────────────────
+  // â”€â”€ Priority 4: Fresh NEW leads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const activeCampaignIds = activeCampaigns.map(c => c.id);
   const newSnap = await leadsRef
     .where('status', '==', 'NEW')
@@ -98,7 +99,7 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
     return { lead: null, queueDepth: remaining.data().count, message: 'Queue empty or outside calling window.' };
   }
 
-  // ── Transactional lock ────────────────────────────────────────────────────
+  // â”€â”€ Transactional lock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let lockedLead: Lead | null = null;
 
   for (const candidate of candidates) {
@@ -203,3 +204,4 @@ export async function applyDisposition(
 
   await docRef.update(updates);
 }
+

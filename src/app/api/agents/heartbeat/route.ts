@@ -1,6 +1,10 @@
 ﻿import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
+export const runtime = 'nodejs';
+import { getAdminDb } from '@/lib/firebase-admin';
+export const runtime = 'nodejs';
+const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
+export const runtime = 'nodejs';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,4 +50,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
+
+
 
