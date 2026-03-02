@@ -29,7 +29,7 @@ export async function POST(request: Request) {
  */
 export async function DELETE(request: Request) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(request.url);
     const agentId = searchParams.get('agentId');
     if (!agentId) return NextResponse.json({ error: 'agentId required' }, { status: 400 });
 
@@ -45,6 +45,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
+
 
 
 
