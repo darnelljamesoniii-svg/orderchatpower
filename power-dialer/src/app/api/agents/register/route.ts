@@ -68,7 +68,14 @@ export async function POST(req: NextRequest) {
         await sendEmail({
           to: email,
           subject: "Your AgenticLife Power Dialer account is ready",
-          body: Hi ,\n\nYour account has been created. Here are your login details:\n\nEmail: \nTemp Password: \n\nLogin at: /login\n\nChange your password after your first login.\n\nWelcome to the team!,
+          body:
+            "Hi " + displayName +
+            "\n\nYour account has been created. Here are your login details:\n\n" +
+            "Email: " + email + "\n" +
+            "Temp Password: " + password + "\n\n" +
+            "Login at: " + appUrl + "/login\n\n" +
+            "Change your password after your first login.\n\n" +
+            "Welcome to the team!",
         });
         emailSent = true;
       } catch (e) {
@@ -94,3 +101,4 @@ function generatePassword(): string {
   const digits = Math.floor(1000 + Math.random() * 9000);
   return ${word};
 }
+
