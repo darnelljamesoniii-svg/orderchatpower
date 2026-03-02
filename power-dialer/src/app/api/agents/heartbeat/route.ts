@@ -1,11 +1,6 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-import { adminDb } from '@/lib/firebase-admin';
-import { COLLECTIONS } from '@/lib/collections';
-
-export const dynamic = 'force-dynamic';
-
 /**
  * Called every 30 seconds by the Battle Station to keep the agent alive.
  * If an agent stops sending heartbeats, a cron/unlock job can mark them OFFLINE.
@@ -50,4 +45,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
+
+
 
