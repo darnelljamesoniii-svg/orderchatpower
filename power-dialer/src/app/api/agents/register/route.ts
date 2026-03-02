@@ -1,26 +1,22 @@
 ﻿export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-
 function env(name: string) {
   const v = process.env[name];
-  if (!v) throw new Error("Missing env: ${name}");
+  if (!v) throw new Error('Missing env: ' + name);
   return v;
 }
-
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS } from '@/lib/collections';
 
 export const dynamic = 'force-dynamic';
 
-
 function env(name: string) {
   const v = process.env[name];
-  if (!v) throw new Error("Missing env: ${name}");
+  if (!v) throw new Error('Missing env: ' + name);
   return v;
 }
-
 /**
  * Called when an agent opens the Battle Station.
  * Creates the agent document if it doesn't exist, or reactivates it.
@@ -73,6 +69,8 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+
 
 
 
