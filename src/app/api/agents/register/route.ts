@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin';
+const adminAuth = getAdminAuth();
+const adminDb = getAdminDb();
+
 
 export const runtime = 'nodejs';
 export const dynamic = "force-dynamic";
@@ -10,9 +14,6 @@ function env(name: string) {
 }
 
 export async function POST(req: NextRequest) {
-import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin';
-const adminAuth = getAdminAuth();
-const adminDb = getAdminDb();
   const { COLLECTIONS } = await import("@/lib/collections");
   const { sendEmail } = await import("@/lib/resend");
 
