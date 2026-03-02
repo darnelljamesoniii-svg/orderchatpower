@@ -1,15 +1,15 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 /**
  * Called every 30 seconds by the Battle Station to keep the agent alive.
  * If an agent stops sending heartbeats, a cron/unlock job can mark them OFFLINE.
  */
-export async function POST() {
+export async function POST(request: Request) {
   const { adminDb } = await import('@/lib/firebase-admin');
   const { COLLECTIONS } = await import('@/lib/collections');
   try {
-    const { agentId, status } = await req.json();
+    const { agentId, status } = await request.json();
     if (!agentId) return NextResponse.json({ error: 'agentId required' }, { status: 400 });
 
     await adminDb.collection(COLLECTIONS.AGENTS).doc(agentId).update({
@@ -27,7 +27,7 @@ export async function POST() {
 /**
  * GET: Mark agent offline (called on page unload via navigator.sendBeacon)
  */
-export async function DELETE(req: NextRequest) {
+export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const agentId = searchParams.get('agentId');
@@ -45,6 +45,8 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
+
+
 
 
 
