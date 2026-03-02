@@ -10,7 +10,9 @@ function env(name: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const { adminAuth, adminDb } = await import("@/lib/firebase-admin");
+import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin';
+const adminAuth = getAdminAuth();
+const adminDb = getAdminDb();
   const { COLLECTIONS } = await import("@/lib/collections");
   const { sendEmail } = await import("@/lib/resend");
 

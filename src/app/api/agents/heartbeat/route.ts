@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(req: Request) {
   try {
-    const { agentId, status } = await request.json();
+    const { agentId, status } = await req.json();
     if (!agentId) return NextResponse.json({ error: 'agentId required' }, { status: 400 });
 
     await adminDb.collection(COLLECTIONS.AGENTS).doc(agentId).update({
