@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 function env(name: string) {
   const v = process.env[name];
-  if (!v) throw new Error(Missing env: );
+  if (!v) throw new Error("Missing env: ${name}");
   return v;
 }
 
@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
 
 function env(name: string) {
   const v = process.env[name];
-  if (!v) throw new Error(Missing env: );
+  if (!v) throw new Error("Missing env: ${name}");
   return v;
 }
 
@@ -73,5 +73,6 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
 
 
