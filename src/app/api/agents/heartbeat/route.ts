@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS } from '@/lib/collections';
 
@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(req: Request) {
   try {
-    const { agentId, status } = await req.json();
+    const { agentId, status } = await request.json();
     if (!agentId) return NextResponse.json({ error: 'agentId required' }, { status: 400 });
 
     await adminDb.collection(COLLECTIONS.AGENTS).doc(agentId).update({
@@ -46,3 +46,4 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
+
