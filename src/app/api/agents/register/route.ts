@@ -78,6 +78,7 @@ if (process.env.RESEND_API_KEY) {
         "Login at: " + appUrl + "/login\n\n" +
         "Change your password after your first login.\n\n" +
         "Welcome to the team!",
+        
     });
 
     emailSent = true;
