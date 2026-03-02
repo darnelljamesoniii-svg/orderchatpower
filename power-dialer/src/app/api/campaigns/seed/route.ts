@@ -1,10 +1,12 @@
-import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
-import { COLLECTIONS, DEFAULT_CAMPAIGNS } from '@/lib/collections';
+﻿import { NextResponse } from "next/server";
 
-export const dynamic = 'force-dynamic';
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-export async function POST() {
+export async function POST(request: Request) {
+  const { adminDb } = await import("@/lib/firebase-admin");
+  const { COLLECTIONS, DEFAULT_CAMPAIGNS } = await import("@/lib/collections");
+
   const batch = adminDb.batch();
   const now = new Date().toISOString();
 
