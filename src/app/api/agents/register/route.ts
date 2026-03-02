@@ -62,19 +62,29 @@ export async function POST(req: NextRequest) {
     }
 
     let emailSent = false;
-    if (process.env.RESEND_API_KEY) {
-      try {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
-        await sendEmail({
-          to: email,
-          subject: "Your AgenticLife Power Dialer account is ready",
-          body: Hi ,\n\nYour account has been created. Here are your login details:\n\nEmail: \nTemp Password: \n\nLogin at: /login\n\nChange your password after your first login.\n\nWelcome to the team!,
-        });
-        emailSent = true;
-      } catch (e) {
-        console.error("[agents/register] Email send failed (non-fatal):", e);
-      }
-    }
+
+if (process.env.RESEND_API_KEY) {
+  try {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+
+    await sendEmail({
+      to: email,
+      subject: "Your AgenticLife Power Dialer account is ready",
+      body:
+        "Hi " + displayName +
+        "\n\nYour account has been created. Here are your login details:\n\n" +
+        "Email: " + email + "\n" +
+        "Temp Password: " + password + "\n\n" +
+        "Login at: " + appUrl + "/login\n\n" +
+        "Change your password after your first login.\n\n" +
+        "Welcome to the team!",
+    });
+
+    emailSent = true;
+  } catch (e) {
+    console.error("[agents/register] Email send failed (non-fatal):", e);
+  }
+}
 
     return NextResponse.json({ success: true, uid: fbUser.uid, email, password, emailSent });
   } catch (err: unknown) {
