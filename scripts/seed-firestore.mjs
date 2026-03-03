@@ -26,6 +26,7 @@ initializeApp({
 });
 
 const db = getFirestore();
+db.settings({ databaseId: 'powerdialer' });
 
 // ── Dispositions ──────────────────────────────────────────────────────────────
 const DISPOSITIONS = [
