@@ -54,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     const cred   = await signInWithEmailAndPassword(auth, email, password);
     console.log('Auth success, uid:', cred.user.uid);
+    console.log('DB app:', (db as any)._databaseId);
     const snap   = await getDoc(doc(db, COLLECTIONS.USERS, cred.user.uid));
     console.log('Doc exists:', snap.exists());
     if (!snap.exists()) {
