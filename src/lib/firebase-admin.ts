@@ -27,8 +27,8 @@ function initAdmin() {
     adminApp = getApps()[0]!;
   }
 
-  adminDb = getFirestore(adminApp);
-  adminDb.settings({ databaseId: 'powerdialer' });
+  adminDb = getFirestore(adminApp, 'powerdialer');
+  adminAuth = getAuth(adminApp);
 }
 
 export function getAdminDb() {
