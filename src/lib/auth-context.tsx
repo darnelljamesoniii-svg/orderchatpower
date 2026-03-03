@@ -53,7 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     const cred   = await signInWithEmailAndPassword(auth, email, password);
+    console.log('Auth success, uid:', cred.user.uid);
     const snap   = await getDoc(doc(db, COLLECTIONS.USERS, cred.user.uid));
+    console.log('Doc exists:', snap.exists());
     if (!snap.exists()) {
       await signOut(auth);
       throw new Error('Account not found. Contact your supervisor.');
