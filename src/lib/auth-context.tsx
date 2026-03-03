@@ -53,10 +53,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     const cred   = await signInWithEmailAndPassword(auth, email, password);
+    const testRef = doc(db, 'users', 'eWdfFSQEhkSEX6jFWUT9WYqGox83');
+    const testSnap = await getDoc(testRef);
+console.log('Hardcoded test exists:', testSnap.exists());
+console.log('Hardcoded test data:', testSnap.data());
     console.log('Auth success, uid:', cred.user.uid);
     console.log('DB app:', (db as any)._databaseId);
     const snap   = await getDoc(doc(db, COLLECTIONS.USERS, cred.user.uid));
     console.log('Doc exists:', snap.exists());
+  const docRef = doc(db, 'users', cred.user.uid);
+    console.log('Trying direct collection name, path:', docRef.path);
+    const snap2 = await getDoc(docRef);
+    console.log('Direct exists:', snap2.exists());
     if (!snap.exists()) {
       await signOut(auth);
       throw new Error('Account not found. Contact your supervisor.');
