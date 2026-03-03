@@ -21,7 +21,7 @@ if (!getApps().length) {
   app = getApps()[0];
 }
 
-db   = getFirestore(app);
+db   = getFirestore(app, 'powerdialer');
 auth = getAuth(app);
 
 export { db, auth };
