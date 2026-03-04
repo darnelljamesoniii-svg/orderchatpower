@@ -1,4 +1,4 @@
-=import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS } from '@/lib/collections';
 import { swClient, buildOutboundLaML } from '@/lib/signalwire-server';
