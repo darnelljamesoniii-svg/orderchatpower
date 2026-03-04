@@ -3,10 +3,10 @@ import { sendEmail } from '@/lib/resend';
 import { getAdminDb } from '@/lib/firebase-admin';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
-import { FieldValue } from 'firebase-admin/firestore';
-export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,32 +19,45 @@ export async function POST(req: NextRequest) {
     // Send via Resend
     const result = await sendEmail({ to, subject, body, placeId, sessionId });
 
-    // Log to call_logs if we have a callLogId
+    const nowIso = new Date().toISOString();
+
+    // Log to call_logs if we have a callLogId (DON'T fail email send if log doc missing)
     if (callLogId) {
-      await adminDb.collection(COLLECTIONS.CALL_LOGS).doc(callLogId).update({
-        emailSentAt: new Date().toISOString(),
-        emailTo:     to,
-      });
+      const ref = adminDb.collection(COLLECTIONS.CALL_LOGS).doc(callLogId);
+      await ref.set(
+        {
+          emailSentAt: nowIso,
+          emailTo: to,
+          updatedAt: nowIso,
+        },
+        { merge: true }
+      );
     }
 
-    // Log to lead doc
+    // Log to lead doc (DON'T fail email send if lead doc missing)
     if (leadId) {
-      await adminDb.collection(COLLECTIONS.LEADS).doc(leadId).update({
-        lastEmailSentAt: new Date().toISOString(),
-        updatedAt:       new Date().toISOString(),
-      });
+      const ref = adminDb.collection(COLLECTIONS.LEADS).doc(leadId);
+      await ref.set(
+        {
+          lastEmailSentAt: nowIso,
+          lastEmailSentTo: to,
+          lastEmailSubject: subject,
+          updatedAt: nowIso,
+        },
+        { merge: true }
+      );
     }
 
     // Log email event to a separate collection for audit trail
     await adminDb.collection('email_logs').add({
-      resendId:  result.id,
+      resendId: result.id,
       to,
       subject,
-      placeId:   placeId ?? null,
+      placeId: placeId ?? null,
       sessionId: sessionId ?? null,
-      agentId:   agentId ?? null,
-      leadId:    leadId ?? null,
-      sentAt:    new Date().toISOString(),
+      agentId: agentId ?? null,
+      leadId: leadId ?? null,
+      sentAt: nowIso,
     });
 
     return NextResponse.json({ success: true, messageId: result.id });
@@ -52,11 +65,7 @@ export async function POST(req: NextRequest) {
     console.error('[/api/email/send]', err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Email send failed' },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
-
-
-
-
