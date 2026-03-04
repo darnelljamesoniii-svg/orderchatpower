@@ -18,7 +18,7 @@ import {
 import toast from 'react-hot-toast';
 
 interface BattleStationProps {
-  agentId:   string;
+  agentId: string;
   agentName: string;
 }
 
@@ -71,18 +71,18 @@ function BattleCardDisplay({ card, loading }: { card: BattleCard | null; loading
 function InlineEdit({ leadId, field, value, placeholder, icon }: {
   leadId: string; field: string; value?: string; placeholder: string; icon: string;
 }) {
-  const [editing, setEditing]   = useState(false);
-  const [local,   setLocal]     = useState(value ?? '');
-  const [saving,  setSaving]    = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [local, setLocal] = useState(value ?? '');
+  const [saving, setSaving] = useState(false);
 
   const save = async () => {
     if (local === (value ?? '')) { setEditing(false); return; }
     setSaving(true);
     try {
       await fetch(`/api/leads/${leadId}`, {
-        method:  'PATCH',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ [field]: local }),
+        body: JSON.stringify({ [field]: local }),
       });
       toast.success(`${field} saved`);
     } catch {
@@ -148,6 +148,7 @@ function EmailModal({ lead, agentName, onClose }: {
 
   const send = async () => {
     if (!to) { toast.error('Email address required'); return; }
+    if (sending) return; // prevent double-send on double-click
     setSending(true);
     try {
       const res = await fetch('/api/email/send', {
@@ -259,15 +260,10 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const objectionCooldown = useRef(false);
 
-  // ── Register + heartbeat ──────────────────────────────────────────────────
+  // ── Heartbeat (DO NOT call /api/agents/register here) ──────────────────────
   useEffect(() => {
-    fetch('/api/agents/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agentId, agentName }),
-    })
-      .then(() => setDeviceReady(true))
-      .catch(() => toast.error('Failed to register agent'));
+    // This page should not create auth users. It only needs "I'm online" status.
+    setDeviceReady(true);
 
     heartbeatRef.current = setInterval(() => {
       fetch('/api/agents/heartbeat', {
@@ -490,7 +486,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
               <span>{isListening ? 'Listening…' : 'Transcript'}</span>
               {isListening && (
                 <div className="ml-auto flex gap-[2px] items-center h-3">
-                  {[0,1,2].map(i => (
+                  {[0, 1, 2].map(i => (
                     <div
                       key={i}
                       className="w-[2px] bg-neon rounded-full animate-waveBar"
