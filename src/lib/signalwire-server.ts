@@ -11,18 +11,24 @@ export const swClient = new RestClient(projectId, apiToken, {
 });
 
 export function generateAccessToken(agentId: string): string {
-  const { AccessToken } = RestClient;
-  const { VoiceGrant }  = AccessToken;
+  // JWT helpers live under `jwt` in @signalwire/compatibility-api
+  const { jwt } = require('@signalwire/compatibility-api');
+  const { AccessToken } = jwt;
+  const { VoiceGrant } = AccessToken;
+
   const grant = new VoiceGrant({
     outgoingApplicationSid: process.env.SIGNALWIRE_APP_SID ?? '',
     incomingAllow: true,
   });
+
   const token = new AccessToken(
     projectId,
+    // Use explicit creds if provided, otherwise fall back safely
     process.env.SIGNALWIRE_API_KEY ?? projectId,
     process.env.SIGNALWIRE_API_SECRET ?? apiToken,
-    { identity: agentId, ttl: 3600 },
+    { identity: agentId, ttl: 3600 }
   );
+
   token.addGrant(grant);
   return token.toJwt();
 }
