@@ -3,11 +3,13 @@ import { generateAccessToken } from '@/lib/signalwire-server';
 import { getNextCallerId } from '@/lib/caller-ids';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
-export async function POST(req: NextRequest) {
+async function handle(agentId: string | null) {
   try {
-    const { agentId } = await req.json();
-    if (!agentId) return NextResponse.json({ error: 'agentId required' }, { status: 400 });
+    if (!agentId) {
+      return NextResponse.json({ error: 'agentId required' }, { status: 400 });
+    }
 
     const [token, callerId] = await Promise.all([
       generateAccessToken(agentId),
@@ -24,3 +26,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export async function POST(req: NextRequest) {
+  const { agentId } = await req.json().catch(() => ({}));
+  return handle(agentId ?? null);
+}
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  return handle(searchParams.get('agentId'));
+}
