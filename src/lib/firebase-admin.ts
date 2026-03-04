@@ -23,11 +23,12 @@ function initAdmin() {
         privateKey: requireEnv('FIREBASE_ADMIN_PRIVATE_KEY').replace(/\\n/g, '\n'),
       }),
     });
+    adminDb = getFirestore(adminApp, 'powerdialer');
+    adminDb.settings({ ignoreUndefinedProperties: true });
   } else {
     adminApp = getApps()[0]!;
+    adminDb = getFirestore(adminApp, 'powerdialer');
   }
-
-  adminDb = getFirestore(adminApp, 'powerdialer');
   adminAuth = getAuth(adminApp);
 }
 
