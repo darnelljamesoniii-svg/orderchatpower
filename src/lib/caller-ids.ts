@@ -1,4 +1,4 @@
-﻿// â”€â”€â”€ Rotating Caller IDs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Rotating Caller IDs ──────────────────────────────────────────────────────
 // Reads from Firestore settings/caller_ids
 // Uses a transaction to atomically increment the index (true round-robin)
 
@@ -28,7 +28,7 @@ export async function getNextCallerId(): Promise<string> {
     await adminDb.runTransaction(async tx => {
       const snap = await tx.get(ref);
       if (!snap.exists) {
-        // First time â€” seed with the env var number
+        // First time — seed with the env var number
         tx.set(ref, { numbers: [fallback], currentIndex: 0 });
         selected = fallback;
         return;

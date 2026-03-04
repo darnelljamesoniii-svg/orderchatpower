@@ -12,9 +12,9 @@ async function handle(agentId: string | null) {
     }
 
     const [token, callerId] = await Promise.all([
-      generateAccessToken(agentId),
-      getNextCallerId(),
-    ]);
+  generateAccessToken(agentId),
+  getNextCallerId(),
+]);
 
     return NextResponse.json({ token, callerId });
   } catch (err: unknown) {

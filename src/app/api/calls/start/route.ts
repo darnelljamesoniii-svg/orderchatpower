@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS } from '@/lib/collections';
-import { swClient, buildOutboundLaML } from '@/lib/signalwire-server';
+import { getSwClient, buildOutboundLaML } from '@/lib/signalwire-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
 
     const statusUrl = `${baseUrl}/api/calls/status`;
 
-    const call = await swClient.calls.create({
+    const call = await getSwClient().calls.create({
       to: toNumber,
       from: fromNumber,
       twiml: buildOutboundLaML(toNumber, statusUrl),

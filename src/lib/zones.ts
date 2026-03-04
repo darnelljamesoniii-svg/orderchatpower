@@ -1,4 +1,4 @@
-﻿// â”€â”€â”€ Zone Ownership â€” Firestore-backed exclusivity engine â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Zone Ownership — Firestore-backed exclusivity engine ────────────────────
 import { getAdminDb } from '@/lib/firebase-admin';
 const adminDb = getAdminDb();
 // Simple geohash implementation (no external dependency)
@@ -24,10 +24,10 @@ function encodeGeohash(lat: number, lng: number, precision: number): string {
   return hash;
 }
 
-// Precision â†’ approximate radius
-// precision 4 â‰ˆ Â±20km   â†’ tier3 (5-mile)
-// precision 5 â‰ˆ Â±2.4km  â†’ tier2 (3-mile)
-// precision 6 â‰ˆ Â±0.6km  â†’ tier1 (1-mile)
+// Precision → approximate radius
+// precision 4 ≈ ±20km   → tier3 (5-mile)
+// precision 5 ≈ ±2.4km  → tier2 (3-mile)
+// precision 6 ≈ ±0.6km  → tier1 (1-mile)
 const TIER_PRECISION: Record<string, number> = {
   tier1: 6,
   tier2: 5,
@@ -74,7 +74,7 @@ export async function checkZoneAvailability(
   const data = snap.data() as ZoneRecord;
   // Check if expired
   if (new Date(data.expiresAt) < new Date()) {
-    // Zone expired â€” delete and mark available
+    // Zone expired — delete and mark available
     await adminDb.collection('zones').doc(docId).delete();
     return { available: true };
   }

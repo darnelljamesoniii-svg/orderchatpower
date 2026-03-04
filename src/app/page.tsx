@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -7,12 +7,12 @@ import type { TierPricing } from '@/lib/pricing';
 import ActivityPulse from './_components/ActivityPulse';
 import { initSession, initReturnVisitDetection, track } from '@/lib/session-tracker';
 
-// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt(n: number) { return n.toLocaleString('en-US', { maximumFractionDigits: 0 }); }
 function currency(n: number) { return `$${fmt(n)}`; }
-function stars(r?: number) { if (!r) return ''; return 'â˜…'.repeat(Math.round(r)) + 'â˜†'.repeat(5 - Math.round(r)); }
+function stars(r?: number) { if (!r) return ''; return '★'.repeat(Math.round(r)) + '☆'.repeat(5 - Math.round(r)); }
 
-// â”€â”€ Photo Carousel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Photo Carousel ────────────────────────────────────────────────────────────
 function PhotoCarousel({ photos }: { photos: { url: string }[] }) {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
@@ -30,7 +30,7 @@ function PhotoCarousel({ photos }: { photos: { url: string }[] }) {
   );
 }
 
-// â”€â”€ Competitor List â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Competitor List ───────────────────────────────────────────────────────────
 function CompetitorList({ title, count, items, color, onExpand }: {
   title: string; count: number; items: NearbyPlace[]; color: string; onExpand?: () => void;
 }) {
@@ -46,7 +46,7 @@ function CompetitorList({ title, count, items, color, onExpand }: {
         </div>
         <div className="flex items-center gap-3">
           <span className="font-mono font-bold text-sm" style={{ color }}>{count} competitors</span>
-          <span className="text-gray-400 text-xs">{open ? 'â–²' : 'â–¼'}</span>
+          <span className="text-gray-400 text-xs">{open ? '▲' : '▼'}</span>
         </div>
       </button>
       {open && (
@@ -73,14 +73,14 @@ function CompetitorList({ title, count, items, color, onExpand }: {
   );
 }
 
-// â”€â”€ ROI Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ROI Badge ─────────────────────────────────────────────────────────────────
 function ROIBadge({ roi }: { roi: TierPricing['roi'] }) {
   return (
     <div className="bg-gradient-to-r from-emerald-900/50 to-emerald-800/30 border border-emerald-500/30 rounded-xl p-3 space-y-1.5">
       <div className="text-emerald-400 font-bold text-xs uppercase tracking-widest">ROI Projection</div>
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <div className="text-white font-bold text-xl">{roi.roiMultiple}Ã—</div>
+          <div className="text-white font-bold text-xl">{roi.roiMultiple}×</div>
           <div className="text-gray-400 text-xs">return</div>
         </div>
         <div>
@@ -96,12 +96,12 @@ function ROIBadge({ roi }: { roi: TierPricing['roi'] }) {
           <div className="text-gray-400 text-xs">to break even</div>
         </div>
       </div>
-      <div className="text-gray-500 text-[10px]">Based on {fmt(roi.monthlySearches)} monthly searches in zone Â· 3% conversion rate</div>
+      <div className="text-gray-500 text-[10px]">Based on {fmt(roi.monthlySearches)} monthly searches in zone · 3% conversion rate</div>
     </div>
   );
 }
 
-// â”€â”€ Tier Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Tier Card ─────────────────────────────────────────────────────────────────
 function TierCard({ tp, businessPlaceId, business, onLock, onPulseStop }: {
   tp: TierPricing;
   businessPlaceId: string;
@@ -129,15 +129,15 @@ function TierCard({ tp, businessPlaceId, business, onLock, onPulseStop }: {
           </div>
         </div>
         <div className="flex gap-3 mt-2 text-xs text-gray-400">
-          <span>ðŸš¶ {tp.tier.walkMinutes}-min walk</span>
-          <span>ðŸš— {tp.tier.driveMiles}-mile drive</span>
+          <span>🚶 {tp.tier.walkMinutes}-min walk</span>
+          <span>🚗 {tp.tier.driveMiles}-mile drive</span>
         </div>
       </div>
 
       <div className="p-4 flex flex-col gap-3 flex-1">
         {/* Competitor knockout */}
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs" style={{ background: color + '20', color }}>âœ•</div>
+          <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs" style={{ background: color + '20', color }}>✕</div>
           <span className="text-white text-sm font-medium">Knocks out {tp.competitorCount} competitors</span>
         </div>
 
@@ -164,8 +164,8 @@ function TierCard({ tp, businessPlaceId, business, onLock, onPulseStop }: {
               <div className="text-gray-500 mt-0.5">{o.description}</div>
               <div className="font-mono font-bold mt-1">
                 {o.id === 'full' && `${currency(o.annualTotal)} today`}
-                {o.id === 'afterpay' && `4 Ã— ${currency(o.monthly!)} Â· Total ${currency(o.annualTotal)}`}
-                {o.id === 'bailout' && `${currency(o.upfront)} today Â· then ${currency(o.monthly!)}/mo Ã— 11`}
+                {o.id === 'afterpay' && `4 × ${currency(o.monthly!)} · Total ${currency(o.annualTotal)}`}
+                {o.id === 'bailout' && `${currency(o.upfront)} today · then ${currency(o.monthly!)}/mo × 11`}
               </div>
             </button>
           ))}
@@ -180,13 +180,13 @@ function TierCard({ tp, businessPlaceId, business, onLock, onPulseStop }: {
               className="w-full py-3 rounded-xl font-bold text-sm tracking-widest uppercase transition-all disabled:opacity-50"
               style={{ background: color, color: '#060810' }}
             >
-              {loading ? 'Processingâ€¦' : `ðŸ”’ Lock ${tp.tier.name}`}
+              {loading ? 'Processing…' : `🔒 Lock ${tp.tier.name}`}
             </button>
           ) : (
             <a href="tel:+18005550000"
               className="block w-full py-3 rounded-xl font-bold text-sm tracking-widest uppercase text-center border"
               style={{ borderColor: color, color }}>
-              ðŸ“ž Call to Lock This Zone
+              📞 Call to Lock This Zone
             </a>
           )}
         </div>
@@ -195,7 +195,7 @@ function TierCard({ tp, businessPlaceId, business, onLock, onPulseStop }: {
   );
 }
 
-// â”€â”€ Sting Animation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Sting Animation ───────────────────────────────────────────────────────────
 function StingAnimation({ competitor, business, stingMessage, onDone }: {
   competitor: NearbyPlace;
   business: PlaceDetails;
@@ -218,15 +218,15 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
 
       {/* Search bar simulation */}
       <div className="bg-white rounded-full px-4 py-2.5 flex items-center gap-2 shadow">
-        <span className="text-gray-400">ðŸ”</span>
+        <span className="text-gray-400">🔍</span>
         <span className="text-gray-600 text-sm">restaurants near me</span>
-        {phase === 'search' && <span className="ml-auto text-xs text-gray-400 animate-pulse">searchingâ€¦</span>}
+        {phase === 'search' && <span className="ml-auto text-xs text-gray-400 animate-pulse">searching…</span>}
       </div>
 
       {/* Spinning candidates */}
       {phase === 'spinning' && (
         <div className="text-center space-y-2">
-          <div className="text-gray-400 text-xs">Evaluating nearby restaurantsâ€¦</div>
+          <div className="text-gray-400 text-xs">Evaluating nearby restaurants…</div>
           <div className="flex justify-center gap-2 flex-wrap">
             {[business.name, competitor.name, 'Other Place', business.name].map((n, i) => (
               <div key={i} className="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400 animate-pulse"
@@ -236,19 +236,19 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
         </div>
       )}
 
-      {/* Result â€” competitor wins */}
+      {/* Result — competitor wins */}
       {(phase === 'result' || phase === 'message') && (
         <div className="bg-white rounded-2xl p-4 shadow-lg">
           <div className="text-xs text-gray-400 mb-2 font-medium">Top recommendation for this search:</div>
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center text-2xl">ðŸ•</div>
+            <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center text-2xl">🍕</div>
             <div>
               <div className="font-bold text-gray-900">{competitor.name}</div>
               <div className="text-amber-400 text-xs">{stars(competitor.rating)} {competitor.rating?.toFixed(1)}</div>
               <div className="text-gray-400 text-xs">{competitor.distanceMetres ? `${(competitor.distanceMetres / 1000).toFixed(1)}km away` : 'Nearby'}</div>
             </div>
             <div className="ml-auto bg-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-full">
-              âœ“ Recommended
+              ✓ Recommended
             </div>
           </div>
         </div>
@@ -264,7 +264,7 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
   );
 }
 
-// â”€â”€ Concierge Demo Iframe â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Concierge Demo Iframe ─────────────────────────────────────────────────────
 function ConciergeDemoFrame() {
   return (
     <div className="w-full h-[600px] lg:h-full rounded-2xl overflow-hidden border border-gray-800 shadow-2xl">
@@ -278,15 +278,15 @@ function ConciergeDemoFrame() {
   );
 }
 
-// â”€â”€ Avg Ticket Selector â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Avg Ticket Selector ───────────────────────────────────────────────────────
 const TICKET_OPTIONS = [
-  { label: 'Fast Casual', range: '$12â€“18', value: 15 },
-  { label: 'Casual Dining', range: '$22â€“35', value: 28 },
-  { label: 'Polished Casual', range: '$35â€“55', value: 45 },
+  { label: 'Fast Casual', range: '$12–18', value: 15 },
+  { label: 'Casual Dining', range: '$22–35', value: 28 },
+  { label: 'Polished Casual', range: '$35–55', value: 45 },
   { label: 'Fine Dining', range: '$65+', value: 75 },
 ];
 
-// â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Main Page ─────────────────────────────────────────────────────────────────
 function UnlockPageContent() {
   const params        = useSearchParams();
   const placeId       = params.get('place_id');
@@ -310,7 +310,7 @@ function UnlockPageContent() {
   const [pulsesStopped, setPulsesStopped] = useState(false);
   const pricingRef = useRef<HTMLDivElement>(null);
 
-  // Init session tracking â€” skip if agent is previewing
+  // Init session tracking — skip if agent is previewing
   useEffect(() => {
     if (!placeId || !sessionId || agentPreview) return;
     initSession(sessionId, placeId, agentId);
@@ -362,7 +362,7 @@ function UnlockPageContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amountCents:  tp.annualPrice * 100,
-          description:  `${tp.tier.name} â€” ${business.name} Zone Lock`,
+          description:  `${tp.tier.name} — ${business.name} Zone Lock`,
           referenceId:  placeId,
           buyerName:    business.name,
         }),
@@ -381,7 +381,7 @@ function UnlockPageContent() {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white p-8 text-center">
         <div>
-          <div className="text-5xl mb-4">ðŸ”—</div>
+          <div className="text-5xl mb-4">🔗</div>
           <h1 className="text-2xl font-bold mb-2">Invalid Link</h1>
           <p className="text-gray-400">This link requires a business ID. Please use the link sent to you by your AgenticLife representative.</p>
         </div>
@@ -394,7 +394,7 @@ function UnlockPageContent() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="text-center space-y-3">
           <div className="w-12 h-12 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-gray-400 text-sm">Analysing your competitive landscapeâ€¦</p>
+          <p className="text-gray-400 text-sm">Analysing your competitive landscape…</p>
         </div>
       </div>
     );
@@ -404,7 +404,7 @@ function UnlockPageContent() {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white p-8 text-center">
         <div>
-          <div className="text-5xl mb-4">âš ï¸</div>
+          <div className="text-5xl mb-4">⚠️</div>
           <p className="text-gray-400">{error || 'Business not found.'}</p>
         </div>
       </div>
@@ -414,7 +414,7 @@ function UnlockPageContent() {
   if (lockSuccess && lockedTier) {
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-8 text-center space-y-6">
-        <div className="text-6xl animate-bounce">ðŸ”’</div>
+        <div className="text-6xl animate-bounce">🔒</div>
         <h1 className="text-3xl font-bold text-white">Zone Locked!</h1>
         <p className="text-gray-300 max-w-sm">
           <strong>{business.name}</strong> is now the exclusive {business.category} recommendation in your {lockedTier.tier.name} zone.
@@ -423,9 +423,9 @@ function UnlockPageContent() {
         <div className="bg-emerald-900/30 border border-emerald-500/30 rounded-2xl p-4 max-w-sm w-full">
           <div className="text-emerald-400 font-bold text-sm uppercase tracking-widest mb-2">Your Zone</div>
           <div className="text-white text-sm space-y-1">
-            <div>ðŸ“ {lockedTier.tier.walkMinutes}-min walk Â· {lockedTier.tier.driveMiles}-mile drive</div>
-            <div>âœ• {lockedTier.competitorCount} competitors locked out</div>
-            <div>ðŸ’° {currency(lockedTier.annualPrice)}/year Â· renews in 12 months</div>
+            <div>📍 {lockedTier.tier.walkMinutes}-min walk · {lockedTier.tier.driveMiles}-mile drive</div>
+            <div>✕ {lockedTier.competitorCount} competitors locked out</div>
+            <div>💰 {currency(lockedTier.annualPrice)}/year · renews in 12 months</div>
           </div>
         </div>
         <p className="text-gray-500 text-sm">A confirmation has been sent to your email. Your representative will be in touch shortly.</p>
@@ -435,7 +435,7 @@ function UnlockPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      {/* Activity Pulse â€” only show to real prospects, not agent previews */}
+      {/* Activity Pulse — only show to real prospects, not agent previews */}
       {competitors && !agentPreview && (
         <ActivityPulse
           business={business}
@@ -445,20 +445,20 @@ function UnlockPageContent() {
       )}
       {/* Hero */}
       <div className="bg-gradient-to-b from-gray-900 to-gray-950 border-b border-gray-800 px-4 py-6 text-center">
-        <div className="text-xs uppercase tracking-widest text-indigo-400 font-bold mb-1">AgenticLife Â· Exclusive Territory</div>
+        <div className="text-xs uppercase tracking-widest text-indigo-400 font-bold mb-1">AgenticLife · Exclusive Territory</div>
         <h1 className="text-2xl md:text-3xl font-bold text-white mb-1">{business.name}</h1>
         <p className="text-gray-400 text-sm">{business.address}</p>
       </div>
 
-      {/* Main content â€” side by side desktop, stacked mobile */}
+      {/* Main content — side by side desktop, stacked mobile */}
       <div className="max-w-7xl mx-auto px-4 py-6 lg:py-10">
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
 
-          {/* LEFT â€” Concierge Demo */}
+          {/* LEFT — Concierge Demo */}
           <div className="w-full lg:w-[420px] lg:sticky lg:top-4 lg:self-start flex-shrink-0">
             <div className="mb-3">
               <h2 className="font-bold text-white text-lg">See What Your Customers See</h2>
-              <p className="text-gray-400 text-sm mt-0.5">This is the concierge experience your customers use right now â€” watch who gets recommended.</p>
+              <p className="text-gray-400 text-sm mt-0.5">This is the concierge experience your customers use right now — watch who gets recommended.</p>
             </div>
 
             {/* Sting animation first, then iframe */}
@@ -474,7 +474,7 @@ function UnlockPageContent() {
             )}
           </div>
 
-          {/* RIGHT â€” Competitor breakdown + pricing */}
+          {/* RIGHT — Competitor breakdown + pricing */}
           <div className="flex-1 space-y-6">
 
             {/* Competitor zones */}
@@ -482,9 +482,9 @@ function UnlockPageContent() {
               <div>
                 <h2 className="font-bold text-white text-lg mb-3">Your Competitive Landscape</h2>
                 <div className="space-y-3">
-                  <CompetitorList title="Zone 1 â€” Local Lock" count={counts.tier1} items={competitors.tier1} color="#00d4ff" onExpand={() => track.zoneExpanded("tier1")} />
-                  <CompetitorList title="Zone 2 â€” Neighborhood Control" count={counts.tier2} items={competitors.tier2} color="#8b5cf6" onExpand={() => track.zoneExpanded("tier2")} />
-                  <CompetitorList title="Zone 3 â€” Area Ownership" count={counts.tier3} items={competitors.tier3} color="#f59e0b" onExpand={() => track.zoneExpanded("tier3")} />
+                  <CompetitorList title="Zone 1 — Local Lock" count={counts.tier1} items={competitors.tier1} color="#00d4ff" onExpand={() => track.zoneExpanded("tier1")} />
+                  <CompetitorList title="Zone 2 — Neighborhood Control" count={counts.tier2} items={competitors.tier2} color="#8b5cf6" onExpand={() => track.zoneExpanded("tier2")} />
+                  <CompetitorList title="Zone 3 — Area Ownership" count={counts.tier3} items={competitors.tier3} color="#f59e0b" onExpand={() => track.zoneExpanded("tier3")} />
                 </div>
               </div>
             )}

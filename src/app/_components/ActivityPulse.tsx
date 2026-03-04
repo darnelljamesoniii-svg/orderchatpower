@@ -1,4 +1,4 @@
-﻿import type { PlaceDetails, NearbyPlace } from "@/lib/google-places";
+import type { PlaceDetails, NearbyPlace } from "@/lib/google-places";
 
 type Props = {
   business: PlaceDetails;
