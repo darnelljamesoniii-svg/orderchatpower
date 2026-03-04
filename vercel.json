@@ -11,6 +11,7 @@
     "src/app/api/gemini/battlecard/route.ts":      { "maxDuration": 15 },
     "src/app/api/gemini/call-summary/route.ts":    { "maxDuration": 30 },
     "src/app/api/signalwire/status/route.ts":      { "maxDuration": 10 },
+    "src/app/api/signalwire/token/route.ts":       { "maxDuration": 10 },
     "src/app/api/concierge/recommend/route.ts":    { "maxDuration": 20 },
     "src/app/api/competition/route.ts":            { "maxDuration": 15 },
     "src/app/api/sessions/return-alert/route.ts":  { "maxDuration": 10 },
