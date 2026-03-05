@@ -113,6 +113,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
       const data = await res.json();
       if (data.lead) {
         setCurrentLead(data.lead);
+        console.log('Lead fields:', JSON.stringify(data.lead));
         clearTranscript();
         setBattleCard(null);
         // AUTO-DIAL if active
