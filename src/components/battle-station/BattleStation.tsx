@@ -116,7 +116,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
         clearTranscript();
         setBattleCard(null);
         // AUTO-DIAL if active
-        makeCall(data.lead.phone);
+        makeCall(data.lead.id);
       } else {
         setMode('IDLE');
         toast.error('Queue Finished');
