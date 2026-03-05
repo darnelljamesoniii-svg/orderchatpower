@@ -230,7 +230,13 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
 
       {/* RIGHT: Active Prospect Data */}
       <div className="flex-1 min-w-0">
-        <ProspectActivityPanel lead={currentLead} onNext={fetchNextLead} loading={fetchingLead} onSendEmail={() => {}} />
+        <ProspectActivityPanel
+  lead={currentLead}
+  agentId={agentId}
+  onNext={fetchNextLead}
+  loading={fetchingLead}
+  onSendEmail={() => {}}
+/>
       </div>
     </div>
   );
