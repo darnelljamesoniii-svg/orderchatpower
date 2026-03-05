@@ -57,7 +57,7 @@ export function useSignalWireDevice({
   }, [agentId, init, stopTimer]);
 
   const makeCall = useCallback(
-    async (toNumber: string) => {
+    async (leadID: string) => {
       if (!agentId) {
         const e = new Error('Missing agentId');
         setError(e.message);
@@ -73,7 +73,7 @@ export function useSignalWireDevice({
         const res = await fetch('/api/calls/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ agentId, toNumber }),
+          body: JSON.stringify({ agentId, leadID }),
         });
 
         const data = await res.json().catch(() => ({} as any));
