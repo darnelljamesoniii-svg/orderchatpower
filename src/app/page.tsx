@@ -321,7 +321,7 @@ function UnlockPageContent() {
   useEffect(() => {
     if (!placeId) { setError('No business ID provided.'); setLoading(false); return; }
 
-    fetch(`/api/competition?place_id=${encodeURIComponent(placeId)}`)
+    fetch(`/api/competition?place_id=${encodeURIComponent(placeId)}&name=${encodeURIComponent(business?.name ?? '')}&address=${encodeURIComponent(business?.address ?? '')}`)
       .then(r => r.json())
       .then(data => {
         if (data.error) throw new Error(data.error);
