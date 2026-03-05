@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useSignalWireDevice } from '@/hooks/useSignalWireDevice';
-import { useSpeechTranscription } from '@/hooks/useSpeechTrancreentscription';
+import { useSpeechTranscription } from '@/hooks/useSpeechTranscription';
 import { DispositionSelector } from '@/components/disposition/DispositionPanel';
 import ProspectActivityPanel from '@/components/battle-station/ProspectActivityPanel';
 import { Button } from '@/components/ui/Button';
