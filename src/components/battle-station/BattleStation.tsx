@@ -42,7 +42,6 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
   const [battleCard, setBattleCard] = useState<BattleCard | null>(null);
   const [cardLoading, setCardLoading] = useState(false);
   const [fetchingLead, setFetchingLead] = useState(false);
-  console.log('Lead fields:', JSON.stringify(data.lead));
   const [isMuted, setIsMuted] = useState(false);
   const [deviceReady, setDeviceReady] = useState(false);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
