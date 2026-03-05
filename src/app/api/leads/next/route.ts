@@ -2,15 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { COLLECTIONS } from "@/lib/collections";
 
+// Force Node.js runtime to handle the firebase-admin/fs/net requirements
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Initialize DB inside try block to catch init errors
+    // 1. Initialize DB inside the handler
     const adminDb = getAdminDb();
     if (!adminDb) {
-      throw new Error("Firebase Admin SDK failed to initialize. Check environment variables.");
+      throw new Error("Firebase Admin SDK failed to initialize.");
     }
 
     // 2. Parse and validate body
@@ -27,14 +28,12 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Verify collections constants exist
-    // We use a static import now to help the compiler resolve dependencies during build
-    if (!COLLECTIONS?.LEADS || !COLLECTIONS?.AGENTS) {
-      throw new Error("Required collection constants (LEADS/AGENTS) are missing from @/lib/collections");
+    if (!COLLECTIONS || !COLLECTIONS.LEADS || !COLLECTIONS.AGENTS) {
+      throw new Error("COLLECTIONS constants are missing or incorrectly exported.");
     }
 
-    // 4. Fetch leads
-    // Note: In a production dialer, you would filter by status (e.g., status == 'NEW')
-    // to prevent multiple agents from getting the same lead.
+    // 4. Fetch the next lead
+    // Standard Dialer Logic: Limit 1, find the first available lead
     const leadsSnapshot = await adminDb
       .collection(COLLECTIONS.LEADS)
       .limit(1)
@@ -52,7 +51,7 @@ export async function POST(req: NextRequest) {
     const leadData = leadDoc.data();
 
     // 5. Update Agent record
-    // Marking the agent as BUSY so they don't receive multiple leads
+    // Marking agent as BUSY to maintain dialer state
     await adminDb.collection(COLLECTIONS.AGENTS).doc(agentId).set({
       currentLeadId: leadDoc.id,
       lastAction: 'fetching_lead',
@@ -70,18 +69,13 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (err: any) {
-    // Comprehensive logging for Vercel Dashboard
-    console.error("[/api/leads/next] Internal Error:", {
-      message: err.message,
-      stack: err.stack,
-    });
+    // Log the error for Vercel console
+    console.error("[/api/leads/next] Internal Error:", err.message);
     
     return NextResponse.json(
       { 
         error: "Internal Server Error", 
-        message: err.message,
-        // Only include details in dev or for debugging
-        debug: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        message: err.message 
       },
       { status: 500 }
     );
