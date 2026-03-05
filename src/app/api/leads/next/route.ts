@@ -6,82 +6,78 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Initialize DB inside try block to catch init errors
+    // 1) Init Admin
     const adminDb = getAdminDb();
     if (!adminDb) {
       throw new Error("Firebase Admin SDK failed to initialize. Check environment variables.");
     }
 
-    // 2. Parse and validate body
-    let body;
+    // 2) Parse + validate body
+    let body: any;
     try {
       body = await req.json();
-    } catch (e) {
+    } catch {
       return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
     }
 
-    const { agentId } = body;
+    const { agentId } = body ?? {};
     if (!agentId) {
       return NextResponse.json({ error: "agentId is required" }, { status: 400 });
     }
 
-    // 3. Resolve collections dynamically
+    // 3) Collections (kept)
     const { COLLECTIONS } = await import("@/lib/collections");
     if (!COLLECTIONS?.LEADS || !COLLECTIONS?.AGENTS) {
       throw new Error("Required collection constants (LEADS/AGENTS) are missing from @/lib/collections");
     }
 
-    // 4. Fetch leads
-    // We fetch leads that haven't been completed. 
-    // Note: To prevent agents from getting the same lead, you'd eventually filter by status.
-    const leadsSnapshot = await adminDb
-      .collection(COLLECTIONS.LEADS)
-      .limit(1)
-      .get();
+    // 4) Use the real queue engine (THIS is the fix)
+    const { getNextLead } = await import("@/lib/queue-engine");
+    const result = await getNextLead(agentId); // { lead, queueDepth, message? }
 
-    if (leadsSnapshot.empty) {
-      return NextResponse.json({ 
-        success: true, 
-        lead: null, 
-        message: "Queue empty" 
-      });
+    // 5) Update agent (kept, but only if we actually got a lead)
+    if (result?.lead?.id) {
+      await adminDb.collection(COLLECTIONS.AGENTS).doc(agentId).set(
+        {
+          currentLeadId: result.lead.id,
+          lastAction: "fetching_lead",
+          lastSeen: new Date().toISOString(),
+          status: "BUSY",
+        },
+        { merge: true }
+      );
+    } else {
+      // No lead available → agent can be considered idle/available
+      await adminDb.collection(COLLECTIONS.AGENTS).doc(agentId).set(
+        {
+          currentLeadId: null,
+          lastAction: "queue_empty",
+          lastSeen: new Date().toISOString(),
+          status: "AVAILABLE",
+        },
+        { merge: true }
+      );
     }
 
-    const leadDoc = leadsSnapshot.docs[0];
-    const leadData = leadDoc.data();
-
-    // 5. Update Agent record and mark the lead as "in-progress" if needed
-    // Using a batch or sequential updates to ensure the agent is linked to this lead
-    await adminDb.collection(COLLECTIONS.AGENTS).doc(agentId).set({
-      currentLeadId: leadDoc.id,
-      lastAction: 'fetching_lead',
-      lastSeen: new Date().toISOString(),
-      status: 'BUSY' // Agent is now occupied with a lead
-    }, { merge: true });
-
-    // 6. Return the lead
+    // 6) Return
     return NextResponse.json({
       success: true,
-      lead: {
-        id: leadDoc.id,
-        ...leadData,
-      },
+      lead: result.lead ?? null,
+      queueDepth: result.queueDepth ?? 0,
+      message: result.message ?? (result.lead ? "OK" : "Queue empty"),
+    });
+  } catch (err: any) {
+    console.error("[/api/leads/next] Internal Error:", {
+      message: err?.message,
+      stack: err?.stack,
+      code: err?.code,
     });
 
-  } catch (err: any) {
-    // Comprehensive logging for Vercel Dashboard
-    console.error("[/api/leads/next] Internal Error:", {
-      message: err.message,
-      stack: err.stack,
-      code: err.code
-    });
-    
     return NextResponse.json(
-      { 
-        error: "Internal Server Error", 
-        message: err.message,
-        // Only include details in dev or for debugging
-        debug: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      {
+        error: "Internal Server Error",
+        message: err?.message ?? "Unknown error",
+        debug: process.env.NODE_ENV === "development" ? err?.stack : undefined,
       },
       { status: 500 }
     );
