@@ -213,7 +213,18 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
           )}
         </Card>
         <Card header={<><ChevronRight size={12} /> Disposition</>} className="flex-1">
-          <DispositionSelector lead={currentLead} onDisposed={() => {}} disabled={!currentLead} />
+          <DispositionSelector 
+  lead={currentLead}
+  agentId={agentId}
+  callLogId={callLogId}
+  onDisposed={(action, squareUrl) => {
+    if (mode === 'ACTIVE') {
+      toast('Next lead in 3s...', { icon: '⏳' });
+      setTimeout(fetchNextLead, 3000);
+    }
+  }}
+  disabled={!currentLead}
+/>
         </Card>
       </div>
 
