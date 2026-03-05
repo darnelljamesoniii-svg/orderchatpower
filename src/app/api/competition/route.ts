@@ -20,57 +20,83 @@ export async function GET(req: NextRequest) {
     }
 
     const adminDb = getAdminDb();
-
-    // 1. Try Firestore First (Handles CIDs and saves API costs)
     let businessData: any = null;
+
+    // 1. TRY FIRESTORE (Searching by your specific schema)
     try {
-      const cachedLead = await adminDb.collection(COLLECTIONS.LEADS).doc(placeId).get();
-      if (cachedLead.exists) {
-        businessData = cachedLead.data();
+      // Check if Doc ID matches OR if kgmid field matches
+      const directDoc = await adminDb.collection(COLLECTIONS.LEADS).doc(placeId).get();
+      if (directDoc.exists) {
+        businessData = directDoc.data();
+      } else {
+        const querySnapshot = await adminDb
+          .collection(COLLECTIONS.LEADS)
+          .where('kgmid', '==', placeId)
+          .limit(1)
+          .get();
+        
+        if (!querySnapshot.empty) {
+          businessData = querySnapshot.docs[0].data();
+        }
       }
     } catch (dbError) {
-      console.error('Firestore lookup failed, falling back to Google:', dbError);
+      console.error('Firestore lookup failed:', dbError);
     }
     
-    // 2. Fallback to Google if not in DB
-    if (!businessData) {
+    // 2. FALLBACK TO GOOGLE (Only for standard Place IDs)
+    if (!businessData && !placeId.startsWith('/g/')) {
       try {
         businessData = await getPlaceDetails(placeId);
       } catch (googleError: any) {
         console.error(`Google API fail for ${placeId}:`, googleError.message);
-        return NextResponse.json({ error: 'Business not found' }, { status: 404 });
       }
     }
 
-    // 3. Defensive check: Ensure we have the bare minimum to proceed
+    // 3. VALIDATION & MAPPING
     if (!businessData) {
-      return NextResponse.json({ error: 'Lead data unavailable' }, { status: 404 });
+      return NextResponse.json({ 
+        error: 'Business not found', 
+        message: `ID ${placeId} not found in Database or Google.` 
+      }, { status: 404 });
     }
 
-    // If we have no location, we can't find competitors. 
-    // Return the business anyway so the dialer has a phone number!
-    if (!businessData.location) {
-      console.warn(`No location found for ${placeId}. Skipping competitor search.`);
+    // Map your DB fields to the format the Unlock page expects
+    const sanitizedBusiness = {
+      id: placeId,
+      name: businessData.businessName || businessData.name || 'Unknown Business',
+      phone: businessData.phone || businessData.phoneNumber || '',
+      address: businessData.address || '',
+      category: businessData.category || 'Restaurant', // Fallback for your sample
+      location: businessData.location || null
+    };
+
+    // 4. DIALER PROTECTION
+    // If we have no location data, we can't find competitors, 
+    // but we MUST return the sanitized business so the dialer has the phone number.
+    const hasValidLocation = 
+      sanitizedBusiness.location && 
+      typeof sanitizedBusiness.location.lat === 'number' && 
+      typeof sanitizedBusiness.location.lng === 'number';
+
+    if (!hasValidLocation) {
       return NextResponse.json({
         success: true,
-        business: { ...businessData, id: placeId },
+        business: sanitizedBusiness,
         competitors: { tier1: [], tier2: [], tier3: [] },
         counts: { tier1: 0, tier2: 0, tier3: 0 },
-        stingMessage: "Competitive data unavailable for this location."
+        stingMessage: "Competitive landscape analysis unavailable for this record."
       });
     }
 
-    const { location, category } = businessData;
-
-    // 4. Fetch competitors
+    // 5. FETCH COMPETITORS (Standard Logic)
     let competitors = { tier1: [] as any[], tier2: [] as any[], tier3: [] as any[] };
     let counts = { tier1: 0, tier2: 0, tier3: 0 };
 
     try {
       const [t1walk, t2walk, t3walk] = await Promise.all([
-        getNearbyCompetitors(location, walkMinutesToMetres(5),  category, placeId),
-        getNearbyCompetitors(location, walkMinutesToMetres(10), category, placeId),
-        getNearbyCompetitors(location, walkMinutesToMetres(20), category, placeId),
+        getNearbyCompetitors(sanitizedBusiness.location, walkMinutesToMetres(5),  sanitizedBusiness.category, placeId),
+        getNearbyCompetitors(sanitizedBusiness.location, walkMinutesToMetres(10), sanitizedBusiness.category, placeId),
+        getNearbyCompetitors(sanitizedBusiness.location, walkMinutesToMetres(20), sanitizedBusiness.category, placeId),
       ]);
 
       const t1Ids = new Set(t1walk.map(p => p.placeId));
@@ -86,10 +112,10 @@ export async function GET(req: NextRequest) {
         tier3: competitors.tier1.length + competitors.tier2.length + competitors.tier3.length,
       };
     } catch (compError) {
-      console.error('Competitor search failed, continuing with empty list:', compError);
+      console.error('Competitor search failed:', compError);
     }
 
-    // 5. Generate Sting Message (Don't let AI failure kill the response)
+    // 6. GENERATE STING
     let stingMessage = '';
     let stingCandidate = null;
 
@@ -100,19 +126,15 @@ export async function GET(req: NextRequest) {
         || competitors.tier1[0] || competitors.tier2[0];
 
       if (stingCandidate) {
-        stingMessage = await generateStingMessage(businessData.name, stingCandidate.name, competitors.tier1.length);
+        stingMessage = await generateStingMessage(sanitizedBusiness.name, stingCandidate.name, competitors.tier1.length);
       }
     } catch (aiError) {
       console.error('AI Sting generation failed:', aiError);
     }
 
-    // Standardize response for the Unlock Page
     return NextResponse.json({
       success: true,
-      business: {
-        ...businessData,
-        id: placeId 
-      },
+      business: sanitizedBusiness,
       stingCompetitor: stingCandidate ?? null,
       stingMessage,
       competitors,
@@ -120,10 +142,7 @@ export async function GET(req: NextRequest) {
     });
 
   } catch (err: any) {
-    console.error('[/api/competition] UNCAUGHT CRITICAL FAILURE:', err);
-    return NextResponse.json({ 
-      error: 'Internal Server Error', 
-      message: err.message 
-    }, { status: 500 });
+    console.error('[/api/competition] UNCAUGHT FAILURE:', err);
+    return NextResponse.json({ error: 'Internal Server Error', message: err.message }, { status: 500 });
   }
 }
