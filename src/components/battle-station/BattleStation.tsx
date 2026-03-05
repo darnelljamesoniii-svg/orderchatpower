@@ -260,22 +260,32 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
   const objectionCooldown = useRef(false);
 
   // ── Register + heartbeat ──────────────────────────────────────────────────
-  useEffect(() => {
-    fetch('/api/agents/register', {
+  // ── Register (now Sync) + heartbeat ──────────────────────────────────────────
+useEffect(() => {
+  // Use the new sync route instead of register
+  fetch('/api/agents/sync', { 
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+      agentId, 
+      agentName,
+      // Optional: Add agentEmail here if you pass it in props
+    }),
+  })
+    .then(() => setDeviceReady(true))
+    .catch(() => toast.error('Failed to sync agent session'));
+
+  // The heartbeat interval stays the same
+  heartbeatRef.current = setInterval(() => {
+    fetch('/api/agents/heartbeat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agentId, agentName }),
-    })
-      .then(() => setDeviceReady(true))
-      .catch(() => toast.error('Failed to register agent'));
+      body: JSON.stringify({ agentId }),
+    }).catch(() => {});
+  }, 30_000);
 
-    heartbeatRef.current = setInterval(() => {
-      fetch('/api/agents/heartbeat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agentId }),
-      }).catch(() => {});
-    }, 30_000);
+  // ... rest of your existing cleanup code ...
+}, [agentId, agentName]);
 
     const handleUnload = () =>
       navigator.sendBeacon('/api/agents/heartbeat', JSON.stringify({ agentId, status: 'OFFLINE' }));
