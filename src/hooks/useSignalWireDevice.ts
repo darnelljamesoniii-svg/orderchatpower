@@ -73,7 +73,7 @@ export function useSignalWireDevice({
         const res = await fetch('/api/calls/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ agentId, leadID }),
+          body: JSON.stringify({ agentId, leadId: leadID }),
         });
 
         const data = await res.json().catch(() => ({} as any));
