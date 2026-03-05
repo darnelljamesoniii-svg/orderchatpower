@@ -116,7 +116,6 @@ function TierCard({ tp, businessPlaceId, business, onLock, onPulseStop }: {
 
   return (
     <div className="bg-gray-900 border rounded-2xl overflow-hidden flex flex-col" style={{ borderColor: color + '50' }}>
-      {/* Header */}
       <div className="px-4 py-3" style={{ background: `linear-gradient(135deg, ${color}20, transparent)` }}>
         <div className="flex items-center justify-between">
           <div>
@@ -135,21 +134,14 @@ function TierCard({ tp, businessPlaceId, business, onLock, onPulseStop }: {
       </div>
 
       <div className="p-4 flex flex-col gap-3 flex-1">
-        {/* Competitor knockout */}
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs" style={{ background: color + '20', color }}>✕</div>
           <span className="text-white text-sm font-medium">Knocks out {tp.competitorCount} competitors</span>
         </div>
-
-        {/* Density badge */}
         <div className="text-xs px-2 py-1 rounded-full w-fit" style={{ background: color + '15', color }}>
           {tp.density.label}
         </div>
-
-        {/* ROI */}
         <ROIBadge roi={tp.roi} />
-
-        {/* Payment options */}
         <div className="space-y-1.5">
           <div className="text-gray-400 text-xs uppercase tracking-widest font-bold">Payment</div>
           {tp.paymentOptions.map(o => (
@@ -170,8 +162,6 @@ function TierCard({ tp, businessPlaceId, business, onLock, onPulseStop }: {
             </button>
           ))}
         </div>
-
-        {/* Lock CTA */}
         <div className="mt-auto pt-2">
           {tp.autoCheckout ? (
             <button
@@ -215,15 +205,11 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
   return (
     <div className="bg-gray-900 border border-gray-700 rounded-2xl p-5 space-y-4">
       <div className="text-center text-gray-400 text-xs uppercase tracking-widest font-bold">Live Recommendation Engine</div>
-
-      {/* Search bar simulation */}
       <div className="bg-white rounded-full px-4 py-2.5 flex items-center gap-2 shadow">
         <span className="text-gray-400">🔍</span>
         <span className="text-gray-600 text-sm">restaurants near me</span>
         {phase === 'search' && <span className="ml-auto text-xs text-gray-400 animate-pulse">searching…</span>}
       </div>
-
-      {/* Spinning candidates */}
       {phase === 'spinning' && (
         <div className="text-center space-y-2">
           <div className="text-gray-400 text-xs">Evaluating nearby restaurants…</div>
@@ -235,8 +221,6 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
           </div>
         </div>
       )}
-
-      {/* Result — competitor wins */}
       {(phase === 'result' || phase === 'message') && (
         <div className="bg-white rounded-2xl p-4 shadow-lg">
           <div className="text-xs text-gray-400 mb-2 font-medium">Top recommendation for this search:</div>
@@ -247,14 +231,10 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
               <div className="text-amber-400 text-xs">{stars(competitor.rating)} {competitor.rating?.toFixed(1)}</div>
               <div className="text-gray-400 text-xs">{competitor.distanceMetres ? `${(competitor.distanceMetres / 1000).toFixed(1)}km away` : 'Nearby'}</div>
             </div>
-            <div className="ml-auto bg-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-full">
-              ✓ Recommended
-            </div>
+            <div className="ml-auto bg-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-full">✓ Recommended</div>
           </div>
         </div>
       )}
-
-      {/* Sting message */}
       {phase === 'message' && (
         <div className="bg-red-950/50 border border-red-500/30 rounded-xl p-3 animate-slideUp">
           <p className="text-red-300 text-sm leading-relaxed">{stingMessage}</p>
@@ -280,18 +260,21 @@ function ConciergeDemoFrame() {
 
 // ── Avg Ticket Selector ───────────────────────────────────────────────────────
 const TICKET_OPTIONS = [
-  { label: 'Fast Casual', range: '$12–18', value: 15 },
-  { label: 'Casual Dining', range: '$22–35', value: 28 },
+  { label: 'Fast Casual',     range: '$12–18', value: 15 },
+  { label: 'Casual Dining',   range: '$22–35', value: 28 },
   { label: 'Polished Casual', range: '$35–55', value: 45 },
-  { label: 'Fine Dining', range: '$65+', value: 75 },
+  { label: 'Fine Dining',     range: '$65+',   value: 75 },
 ];
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 function UnlockPageContent() {
-  const params    = useSearchParams();
-  const placeId   = params.get('place_id');
-  const sessionId = params.get('sessionId') ?? undefined;
-  const agentId   = params.get('agentId')   ?? undefined;
+  const params       = useSearchParams();
+  const placeId      = params.get('place_id');
+  const sessionId    = params.get('sessionId')     ?? undefined;
+  const agentId      = params.get('agentId')       ?? undefined;
+  const agentPreview = params.get('agent_preview') === 'true';
+  const businessName = params.get('name')          ?? '';
+  const businessAddr = params.get('address')       ?? '';
 
   const [business,      setBusiness]      = useState<PlaceDetails | null>(null);
   const [stingComp,     setStingComp]     = useState<NearbyPlace | null>(null);
@@ -309,18 +292,18 @@ function UnlockPageContent() {
   const [pulsesStopped, setPulsesStopped] = useState(false);
   const pricingRef = useRef<HTMLDivElement>(null);
 
-  // Init session tracking
+  // Init session tracking — skip if agent is previewing
   useEffect(() => {
-    if (!placeId || !sessionId) return;
+    if (!placeId || !sessionId || agentPreview) return;
     initSession(sessionId, placeId, agentId);
     initReturnVisitDetection(sessionId, placeId, agentId);
-  }, [placeId, sessionId, agentId]);
+  }, [placeId, sessionId, agentId, agentPreview]);
 
   // Load competition data
   useEffect(() => {
     if (!placeId) { setError('No business ID provided.'); setLoading(false); return; }
 
-    fetch(`/api/competition?place_id=${encodeURIComponent(placeId)}`)
+    fetch(`/api/competition?place_id=${encodeURIComponent(placeId)}&name=${encodeURIComponent(businessName)}&address=${encodeURIComponent(businessAddr)}`)
       .then(r => r.json())
       .then(data => {
         if (data.error) throw new Error(data.error);
@@ -355,15 +338,14 @@ function UnlockPageContent() {
     setLocking(true);
     setLockedTier(tp);
     try {
-      // Create Square payment link
       const sqRes = await fetch('/api/square/payment-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amountCents:  tp.annualPrice * 100,
-          description:  `${tp.tier.name} — ${business.name} Zone Lock`,
-          referenceId:  placeId,
-          buyerName:    business.name,
+          amountCents: tp.annualPrice * 100,
+          description: `${tp.tier.name} — ${business.name} Zone Lock`,
+          referenceId: placeId,
+          buyerName:   business.name,
         }),
       });
       const { url } = await sqRes.json();
@@ -434,33 +416,23 @@ function UnlockPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      {/* Activity Pulse — uses only real competitor data, no fabrication */}
-      {competitors && (
-        <ActivityPulse
-          business={business}
-          competitors={competitors}
-          stopped={pulsesStopped}
-        />
+      {competitors && !agentPreview && (
+        <ActivityPulse business={business} competitors={competitors} stopped={pulsesStopped} />
       )}
-      {/* Hero */}
       <div className="bg-gradient-to-b from-gray-900 to-gray-950 border-b border-gray-800 px-4 py-6 text-center">
         <div className="text-xs uppercase tracking-widest text-indigo-400 font-bold mb-1">AgenticLife · Exclusive Territory</div>
         <h1 className="text-2xl md:text-3xl font-bold text-white mb-1">{business.name}</h1>
         <p className="text-gray-400 text-sm">{business.address}</p>
       </div>
 
-      {/* Main content — side by side desktop, stacked mobile */}
       <div className="max-w-7xl mx-auto px-4 py-6 lg:py-10">
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
 
-          {/* LEFT — Concierge Demo */}
           <div className="w-full lg:w-[420px] lg:sticky lg:top-4 lg:self-start flex-shrink-0">
             <div className="mb-3">
               <h2 className="font-bold text-white text-lg">See What Your Customers See</h2>
               <p className="text-gray-400 text-sm mt-0.5">This is the concierge experience your customers use right now — watch who gets recommended.</p>
             </div>
-
-            {/* Sting animation first, then iframe */}
             {stingComp && !stingDone ? (
               <StingAnimation
                 competitor={stingComp}
@@ -473,22 +445,18 @@ function UnlockPageContent() {
             )}
           </div>
 
-          {/* RIGHT — Competitor breakdown + pricing */}
           <div className="flex-1 space-y-6">
-
-            {/* Competitor zones */}
             {competitors && counts && (
               <div>
                 <h2 className="font-bold text-white text-lg mb-3">Your Competitive Landscape</h2>
                 <div className="space-y-3">
-                  <CompetitorList title="Zone 1 — Local Lock" count={counts.tier1} items={competitors.tier1} color="#00d4ff" onExpand={() => track.zoneExpanded("tier1")} />
-                  <CompetitorList title="Zone 2 — Neighborhood Control" count={counts.tier2} items={competitors.tier2} color="#8b5cf6" onExpand={() => track.zoneExpanded("tier2")} />
-                  <CompetitorList title="Zone 3 — Area Ownership" count={counts.tier3} items={competitors.tier3} color="#f59e0b" onExpand={() => track.zoneExpanded("tier3")} />
+                  <CompetitorList title="Zone 1 — Local Lock"            count={counts.tier1} items={competitors.tier1} color="#00d4ff" onExpand={() => track.zoneExpanded("tier1")} />
+                  <CompetitorList title="Zone 2 — Neighborhood Control"  count={counts.tier2} items={competitors.tier2} color="#8b5cf6" onExpand={() => track.zoneExpanded("tier2")} />
+                  <CompetitorList title="Zone 3 — Area Ownership"        count={counts.tier3} items={competitors.tier3} color="#f59e0b" onExpand={() => track.zoneExpanded("tier3")} />
                 </div>
               </div>
             )}
 
-            {/* Avg ticket selector */}
             <div ref={pricingRef}>
               <h2 className="font-bold text-white text-lg mb-1">Lock Your Zone</h2>
               <p className="text-gray-400 text-sm mb-4">Pick your average ticket size so we can show you the ROI for each tier.</p>
@@ -506,7 +474,6 @@ function UnlockPageContent() {
                 ))}
               </div>
 
-              {/* 3 tier cards */}
               {pricings ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {pricings.map(tp => (
@@ -529,14 +496,13 @@ function UnlockPageContent() {
               )}
             </div>
 
-            {/* Comparison vs Yelp/Google */}
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
               <div className="text-gray-400 text-xs uppercase tracking-widest font-bold mb-3">How We Compare</div>
               <div className="space-y-2">
                 {[
-                  { name: 'Yelp Enhanced', price: '$400/mo', note: 'Still competing with everyone', exclusive: false },
-                  { name: 'Google LSA', price: '$350+/mo', note: 'Pay per click, no exclusivity', exclusive: false },
-                  { name: 'AgenticLife Zone Lock', price: `${currency(pricings?.[0]?.monthlyEquiv ?? 150)}/mo equiv.`, note: 'You are the ONLY recommendation', exclusive: true },
+                  { name: 'Yelp Enhanced',          price: '$400/mo',                                                note: 'Still competing with everyone',    exclusive: false },
+                  { name: 'Google LSA',              price: '$350+/mo',                                               note: 'Pay per click, no exclusivity',    exclusive: false },
+                  { name: 'AgenticLife Zone Lock',   price: `${currency(pricings?.[0]?.monthlyEquiv ?? 150)}/mo equiv.`, note: 'You are the ONLY recommendation', exclusive: true  },
                 ].map(item => (
                   <div key={item.name} className={`flex items-center justify-between px-3 py-2.5 rounded-xl ${item.exclusive ? 'bg-emerald-900/30 border border-emerald-500/30' : 'bg-gray-800'}`}>
                     <div>
@@ -548,7 +514,6 @@ function UnlockPageContent() {
                 ))}
               </div>
             </div>
-
           </div>
         </div>
       </div>
