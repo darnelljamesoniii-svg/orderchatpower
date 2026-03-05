@@ -142,14 +142,14 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
               <Wifi size={12} className="text-accent" /> Prospect Mirror (Unlock)
             </div>
             {currentLead && (
-              
-                href={`/unlock?place_id=${encodeURIComponent(currentLead.kgmid ?? '')}&name=${encodeURIComponent(currentLead.businessName ?? '')}&address=${encodeURIComponent(currentLead.address ?? '')}&sessionId=${encodeURIComponent(currentLead.sessionId ?? '')}`}
-                target="_blank"
-                className="text-white/40 hover:text-white"
-              >
-                <ExternalLink size={12} />
-              </a>
-            )}
+  
+    href={`/unlock?place_id=${encodeURIComponent(currentLead.kgmid ?? '')}&name=${encodeURIComponent(currentLead.businessName ?? '')}&address=${encodeURIComponent(currentLead.address ?? '')}&sessionId=${encodeURIComponent(currentLead.sessionId ?? '')}`}
+    target="_blank"
+    className="text-white/40 hover:text-white"
+  >
+    <ExternalLink size={12} />
+  </a>
+)}
           </div>
         } noPadding>
           <div className="relative bg-black aspect-[4/3] border-b border-white/5 overflow-hidden">
