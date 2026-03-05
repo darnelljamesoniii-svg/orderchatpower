@@ -2,7 +2,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { generateAccessToken } from "@/lib/signalwire-server";
 
 /**
  * POST /api/signalwire/token
@@ -11,11 +10,14 @@ import { generateAccessToken } from "@/lib/signalwire-server";
  */
 export async function POST(req: Request) {
   try {
-    const body = await req.json().catch(() => ({}));
+    const body: any = await req.json().catch(() => ({}));
     const agentId =
-      typeof (body as any)?.agentId === "string" && (body as any).agentId.trim()
-        ? (body as any).agentId.trim()
+      typeof body?.agentId === "string" && body.agentId.trim()
+        ? body.agentId.trim()
         : "agent";
+
+    // IMPORTANT: avoid top-level import crashing the route
+    const { generateAccessToken } = await import("@/lib/signalwire-server");
 
     const token = await generateAccessToken(agentId);
     return NextResponse.json({ token }, { status: 200 });
@@ -27,9 +29,10 @@ export async function POST(req: Request) {
   }
 }
 
+// Optional: helpful GET response
 export async function GET() {
   return NextResponse.json(
-    { error: "Use POST with JSON body: { agentId: string }" },
-    { status: 405 }
+    { ok: true, message: "Use POST with JSON body: { agentId: string }" },
+    { status: 200 }
   );
 }
