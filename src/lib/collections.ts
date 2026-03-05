@@ -1,43 +1,89 @@
-// Collection name constants — single source of truth
-export const COLLECTIONS = {
-  LEADS:        'leads',
-  AGENTS:       'agents',
-  DISPOSITIONS: 'dispositions',
-  CAMPAIGNS:    'campaigns',
-  CALL_LOGS:    'call_logs',
-  SETTINGS:     'settings',
-  USERS:        'users',
-} as const;
+import { NextRequest, NextResponse } from "next/server";
+import { getAdminDb } from "@/lib/firebase-admin";
 
-// Default dispositions — seeded on first supervisor load
-export const DEFAULT_DISPOSITIONS = [
-  { id: 'no_answer',    label: 'No Answer',       action: 'NO_ANSWER',    color: '#94a3b8', delayMinutes: 120,  isActive: true, sortOrder: 1 },
-  { id: 'busy',         label: 'Busy',             action: 'BUSY',         color: '#f59e0b', delayMinutes: 5,    isActive: true, sortOrder: 2 },
-  { id: 'voicemail',    label: 'Voicemail',        action: 'VOICEMAIL',    color: '#8b5cf6', delayMinutes: 1440, isActive: true, sortOrder: 3 },
-  { id: 'recall',       label: 'Schedule Recall',  action: 'RECALL',       color: '#6366f1', delayMinutes: 0,    isActive: true, sortOrder: 4 },
-  { id: 'success',      label: 'SUCCESS 🎯',       action: 'SUCCESS',      color: '#00ff88', delayMinutes: 0,    isActive: true, sortOrder: 5 },
-  { id: 'dnc',          label: 'DNC',              action: 'DNC',          color: '#ef4444', delayMinutes: 0,    isActive: true, sortOrder: 6 },
-  { id: 'wrong_number', label: 'Wrong Number',     action: 'WRONG_NUMBER', color: '#4b5563', delayMinutes: 0,    isActive: true, sortOrder: 7 },
-] as const;
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-// Default campaign waves
-export const DEFAULT_CAMPAIGNS = [
-  {
-    id:             'wave1',
-    name:           'Wave 1 — General',
-    isActive:       true,
-    startHourLocal: 9,
-    endHourLocal:   20,
-    timezone:       'America/New_York',
-    description:    'General businesses — call during local business hours',
-  },
-  {
-    id:             'wave2',
-    name:           'Wave 2 — Pizza / Restaurants',
-    isActive:       false,
-    startHourLocal: 11,
-    endHourLocal:   22,
-    timezone:       'America/New_York',
-    description:    'Restaurants — call during lunch/dinner service windows',
-  },
-] as const;
+export async function POST(req: NextRequest) {
+  try {
+    // 1. Initialize DB inside try block to catch init errors
+    const adminDb = getAdminDb();
+    if (!adminDb) {
+      throw new Error("Firebase Admin SDK failed to initialize. Check environment variables.");
+    }
+
+    // 2. Parse and validate body
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
+    }
+
+    const { agentId } = body;
+    if (!agentId) {
+      return NextResponse.json({ error: "agentId is required" }, { status: 400 });
+    }
+
+    // 3. Resolve collections dynamically
+    const { COLLECTIONS } = await import("@/lib/collections");
+    if (!COLLECTIONS?.LEADS || !COLLECTIONS?.AGENTS) {
+      throw new Error("Required collection constants (LEADS/AGENTS) are missing from @/lib/collections");
+    }
+
+    // 4. Fetch leads
+    // We fetch leads that haven't been completed. 
+    // Note: To prevent agents from getting the same lead, you'd eventually filter by status.
+    const leadsSnapshot = await adminDb
+      .collection(COLLECTIONS.LEADS)
+      .limit(1)
+      .get();
+
+    if (leadsSnapshot.empty) {
+      return NextResponse.json({ 
+        success: true, 
+        lead: null, 
+        message: "Queue empty" 
+      });
+    }
+
+    const leadDoc = leadsSnapshot.docs[0];
+    const leadData = leadDoc.data();
+
+    // 5. Update Agent record and mark the lead as "in-progress" if needed
+    // Using a batch or sequential updates to ensure the agent is linked to this lead
+    await adminDb.collection(COLLECTIONS.AGENTS).doc(agentId).set({
+      currentLeadId: leadDoc.id,
+      lastAction: 'fetching_lead',
+      lastSeen: new Date().toISOString(),
+      status: 'BUSY' // Agent is now occupied with a lead
+    }, { merge: true });
+
+    // 6. Return the lead
+    return NextResponse.json({
+      success: true,
+      lead: {
+        id: leadDoc.id,
+        ...leadData,
+      },
+    });
+
+  } catch (err: any) {
+    // Comprehensive logging for Vercel Dashboard
+    console.error("[/api/leads/next] Internal Error:", {
+      message: err.message,
+      stack: err.stack,
+      code: err.code
+    });
+    
+    return NextResponse.json(
+      { 
+        error: "Internal Server Error", 
+        message: err.message,
+        // Only include details in dev or for debugging
+        debug: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      },
+      { status: 500 }
+    );
+  }
+}
