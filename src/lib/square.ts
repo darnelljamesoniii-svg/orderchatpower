@@ -1,4 +1,4 @@
-const SQUARE_BASE_URL  = process.env.SQUARE_BASE_URL  || 'https://connect.squareupsandbox.com';
+const SQUARE_BASE_URL  = process.env.SQUARE_BASE_URL  || 'https://connect.squareup.com';
 const SQUARE_TOKEN     = process.env.SQUARE_ACCESS_TOKEN!;
 const SQUARE_LOCATION  = process.env.SQUARE_LOCATION_ID!;
 
