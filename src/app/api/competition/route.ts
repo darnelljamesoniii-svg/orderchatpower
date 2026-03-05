@@ -6,17 +6,19 @@ export const dynamic = 'force-dynamic';
 
 const KEY = process.env.GOOGLE_PLACES_API_KEY!;
 
-async function resolveToPlaceId(kgmid: string): Promise<string> {
-  // If it's already a ChIJ... place ID, return as-is
+async function resolveToPlaceId(kgmid: string, businessName?: string, address?: string): Promise<string> {
   if (kgmid.startsWith('ChIJ')) return kgmid;
 
-  // Otherwise do a Find Place search using the kgmid as input
-  const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(kgmid)}&inputtype=textquery&fields=place_id&key=${KEY}`;
+  // Use business name + address to find the real place ID
+  const query = [businessName, address].filter(Boolean).join(' ');
+  if (!query) throw new Error('Need business name or address to resolve place ID');
+
+  const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(query)}&inputtype=textquery&fields=place_id&key=${KEY}`;
   const res  = await fetch(url);
   const data = await res.json();
 
   if (data.candidates?.[0]?.place_id) return data.candidates[0].place_id;
-  throw new Error(`Could not resolve place ID for: ${kgmid}`);
+  throw new Error(`Could not resolve place ID for: ${query}`);
 }
 
 export async function GET(req: NextRequest) {
