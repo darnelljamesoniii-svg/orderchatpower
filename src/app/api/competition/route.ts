@@ -9,8 +9,8 @@ const KEY = process.env.GOOGLE_PLACES_API_KEY!;
 async function resolveToPlaceId(kgmid: string, businessName?: string, address?: string): Promise<string> {
   if (kgmid.startsWith('ChIJ')) return kgmid;
 
-  const query = [businessName, address].filter(Boolean).join(' ');
-  if (!query) throw new Error('Need business name or address to resolve place ID');
+  // Use whatever we have — name+address, just name, or just the kgmid itself
+  const query = [businessName, address].filter(Boolean).join(' ') || kgmid;
 
   const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(query)}&inputtype=textquery&fields=place_id&key=${KEY}`;
   const res  = await fetch(url);
