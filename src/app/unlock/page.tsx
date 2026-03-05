@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getFirestore, doc, onSnapshot, setDoc, updateDoc, collection } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { 
@@ -9,21 +9,46 @@ import {
   Zap, Clock, CheckCircle2, ChevronDown, ChevronUp, Star, Users, Phone
 } from 'lucide-react';
 
-// --- Firebase Configuration ---
-const firebaseConfig = JSON.parse(__firebase_config);
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-const appIdRaw = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-// CRITICAL: Sanitize appId to ensure it doesn't split into multiple Firestore segments
-const appId = appIdRaw.replace(/\//g, '_');
+// --- Safe Firebase Configuration Access ---
+// Prerender-safe variable access
+const getFirebaseConfig = () => {
+  if (typeof __firebase_config !== 'undefined') {
+    try {
+      return JSON.parse(__firebase_config);
+    } catch (e) {
+      console.error("Failed to parse firebase config");
+      return null;
+    }
+  }
+  return null;
+};
+
+const getAppId = () => {
+  const rawId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+  // Sanitize slashes to prevent Firestore path segment errors
+  return rawId.replace(/\//g, '_');
+};
+
+const initFirebase = () => {
+  const config = getFirebaseConfig();
+  if (!config) return { db: null, auth: null, appId: getAppId() };
+  
+  const app = getApps().length > 0 ? getApp() : initializeApp(config);
+  return {
+    db: getFirestore(app),
+    auth: getAuth(app),
+    appId: getAppId()
+  };
+};
+
+const { db, auth, appId } = initFirebase();
 
 // --- Utility Helpers ---
 const fmt = (n) => (typeof n === 'number' ? n.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '0');
 const currency = (n) => `$${fmt(n)}`;
 const stars = (r) => {
-  if (!r) return '';
-  const count = Math.round(r);
+  if (typeof r !== 'number' || isNaN(r)) return '';
+  const count = Math.min(5, Math.max(0, Math.round(r)));
   return '★'.repeat(count) + '☆'.repeat(5 - count);
 };
 
@@ -204,7 +229,7 @@ const StingAnimation = ({ competitor, business, stingMessage, onDone }) => {
         <div className="text-center space-y-3 animate-fadeIn">
           <div className="text-indigo-400 text-[11px] font-bold">Scanning local lock...</div>
           <div className="flex justify-center gap-2 flex-wrap">
-            {[business.name, competitor?.name || 'Local Rival', 'Local Rival', 'Top Rated'].map((n, i) => (
+            {[business?.name || 'Your Business', competitor?.name || 'Local Rival', 'Local Rival', 'Top Rated'].map((n, i) => (
               <div key={i} className="text-[10px] font-bold px-3 py-1.5 rounded-full bg-gray-800 text-gray-400 animate-pulse border border-gray-700">{n}</div>
             ))}
           </div>
@@ -261,9 +286,10 @@ const App = () => {
   
   const scrollRef = useRef(0);
 
-  // 1. Auth and Live Sync Initialization
+  // 1. Auth Initialization
   useEffect(() => {
     const init = async () => {
+      if (!auth) return;
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
@@ -275,15 +301,15 @@ const App = () => {
       }
     };
     init();
-    const unsubscribe = onAuthStateChanged(auth, setUser);
+    const unsubscribe = auth ? onAuthStateChanged(auth, setUser) : () => {};
     return () => unsubscribe();
   }, []);
 
   // 2. Real-time Sync Listener
   useEffect(() => {
-    if (!user || !sessionId) return;
-    // CRITICAL FIX: Ensure appId is treated as a single segment even if it has slashes
-    // Correct Path: /artifacts/{appId}/public/data/sync_states/{sessionId}
+    if (!user || !sessionId || !db) return;
+    
+    // Path uses sanitized appId to ensure exactly 6 segments (Even)
     const stateDoc = doc(db, 'artifacts', appId, 'public', 'data', 'sync_states', sessionId);
     
     const unsubscribe = onSnapshot(stateDoc, (snap) => {
@@ -301,7 +327,7 @@ const App = () => {
     return () => unsubscribe();
   }, [user, sessionId, isMirror]);
 
-  // 3. Fetch Data (Dependent on Category)
+  // 3. Fetch Data
   useEffect(() => {
     if (!placeId) return;
     setLoading(true);
@@ -310,22 +336,26 @@ const App = () => {
       .then(data => {
         if (data.success) {
           setBusiness(data.business);
-          setCompetitors(data.competitors);
-          setCounts(data.counts);
+          setCompetitors(data.competitors || { tier1: [], tier2: [], tier3: [] });
+          setCounts(data.counts || { tier1: 0, tier2: 0, tier3: 0 });
         }
       })
       .catch(e => console.error("Fetch failed:", e))
       .finally(() => setLoading(false));
   }, [placeId, category]);
 
-  // 4. Calculate ROI Pricing
+  // 4. ROI Pricing
   useEffect(() => {
     if (!counts || !counts.tier1) return;
     fetch('/api/pricing', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        competitorCounts: { tier1: counts.tier1, tier2: counts.tier2 - counts.tier1, tier3: counts.tier3 - counts.tier2 },
+        competitorCounts: { 
+          tier1: counts.tier1, 
+          tier2: (counts.tier2 || 0) - (counts.tier1 || 0), 
+          tier3: (counts.tier3 || 0) - (counts.tier2 || 0) 
+        },
         avgTicket,
       }),
     })
@@ -334,9 +364,9 @@ const App = () => {
       .catch(e => console.error("Pricing error:", e));
   }, [counts, avgTicket]);
 
-  // 5. Track Scroll (Prospect side writes to Firestore)
+  // 5. Scroll Sync
   useEffect(() => {
-    if (isMirror || !user || !sessionId) return;
+    if (isMirror || !user || !sessionId || !db) return;
     const handleScroll = () => {
       const pos = window.scrollY;
       if (Math.abs(pos - scrollRef.current) > 50) {
@@ -353,7 +383,7 @@ const App = () => {
 
   const updateLiveCategory = async (cat) => {
     setCategory(cat);
-    if (!isMirror && user && sessionId) {
+    if (!isMirror && user && sessionId && db) {
       const stateDoc = doc(db, 'artifacts', appId, 'public', 'data', 'sync_states', sessionId);
       await setDoc(stateDoc, { category: cat }, { merge: true });
     }
@@ -362,7 +392,7 @@ const App = () => {
   const handleLock = async (tier) => {
     if (isMirror) return;
     setLockSuccess(true);
-    if (user && sessionId) {
+    if (user && sessionId && db) {
       const stateDoc = doc(db, 'artifacts', appId, 'public', 'data', 'sync_states', sessionId);
       await setDoc(stateDoc, { lockSuccess: true }, { merge: true });
     }
@@ -451,7 +481,7 @@ const App = () => {
               <p className="text-gray-500 text-sm max-w-xl leading-relaxed mb-8">By locking your category, you become the exclusive recommendation in these zones. We've analyzed {counts.tier3} competitors to project your return.</p>
               <div className="flex flex-wrap gap-2 mb-10">
                 {TICKET_OPTIONS.map(t => (
-                  <button key={t.value} onClick={() => { setAvgTicket(t.value); if(!isMirror && user) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sync_states', sessionId), { avgTicket: t.value }); }} className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${avgTicket === t.value ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-gray-900 border-gray-800 text-gray-500 hover:border-gray-600'}`}>{t.label} <span className="opacity-40 ml-1">{t.range}</span></button>
+                  <button key={t.value} onClick={() => { setAvgTicket(t.value); if(!isMirror && user && db) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sync_states', sessionId), { avgTicket: t.value }); }} className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${avgTicket === t.value ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-gray-900 border-gray-800 text-gray-500 hover:border-gray-600'}`}>{t.label} <span className="opacity-40 ml-1">{t.range}</span></button>
                 ))}
               </div>
               {pricings ? (
