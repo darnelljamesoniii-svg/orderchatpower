@@ -139,7 +139,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
         <Card header={
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-2"><Wifi size={12} className="text-accent" /> Prospect Mirror (Unlock)</div>
-            {currentLead && <a ref={`/unlock?place_id=${currentLead.kgmid}&name=${encodeURIComponent(currentLead.businessName ?? '')}&address=${encodeURIComponent(currentLead.address ?? '')}`}target="_blank" className="text-white/40 hover:text-white"><ExternalLink size={12} /></a>}
+            {currentLead && <a href={`/unlock?place_id=${currentLead.kgmid}&name=${encodeURIComponent(currentLead.businessName ?? '')}&address=${encodeURIComponent(currentLead.address ?? '')}`}target="_blank" className="text-white/40 hover:text-white"><ExternalLink size={12} /></a>}
           </div>
         } noPadding>
           <div className="relative bg-black aspect-[4/3] border-b border-white/5 overflow-hidden">
