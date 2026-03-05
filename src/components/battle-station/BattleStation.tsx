@@ -259,34 +259,27 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const objectionCooldown = useRef(false);
 
-  // ── Register + heartbeat ──────────────────────────────────────────────────
   // ── Register (now Sync) + heartbeat ──────────────────────────────────────────
-useEffect(() => {
-  // Use the new sync route instead of register
-  fetch('/api/agents/sync', { 
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
-      agentId, 
-      agentName,
-      // Optional: Add agentEmail here if you pass it in props
-    }),
-  })
-    .then(() => setDeviceReady(true))
-    .catch(() => toast.error('Failed to sync agent session'));
-
-  // The heartbeat interval stays the same
-  heartbeatRef.current = setInterval(() => {
-    fetch('/api/agents/heartbeat', {
+  useEffect(() => {
+    // 1. Sync session
+    fetch('/api/agents/sync', { 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agentId }),
-    }).catch(() => {});
-  }, 30_000);
+      body: JSON.stringify({ agentId, agentName }),
+    })
+      .then(() => setDeviceReady(true))
+      .catch(() => toast.error('Failed to sync agent session'));
 
-  // ... rest of your existing cleanup code ...
-}, [agentId, agentName]);
+    // 2. Heartbeat
+    heartbeatRef.current = setInterval(() => {
+      fetch('/api/agents/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId }),
+      }).catch(() => {});
+    }, 30_000);
 
+    // 3. Cleanup & Unload
     const handleUnload = () =>
       navigator.sendBeacon('/api/agents/heartbeat', JSON.stringify({ agentId, status: 'OFFLINE' }));
 
@@ -297,6 +290,9 @@ useEffect(() => {
       window.removeEventListener('beforeunload', handleUnload);
     };
   }, [agentId, agentName]);
+
+  // ── Objection → battle card ────────────────────────────────────────────────
+  const onObjectionDetected = useCallback(async (text: string) => {
 
   // ── Objection → battle card ────────────────────────────────────────────────
   const onObjectionDetected = useCallback(async (text: string) => {
