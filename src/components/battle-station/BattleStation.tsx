@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useSignalWireDevice } from '@/hooks/useSignalWireDevice';
-import { useSpeechTranscription } from '@/hooks/useSpeechTranscription';
+import { useSpeechTranscription } from '@/hooks/useSpeechTrancreentscription';
 import { DispositionSelector } from '@/components/disposition/DispositionPanel';
 import ProspectActivityPanel from '@/components/battle-station/ProspectActivityPanel';
 import { Button } from '@/components/ui/Button';
@@ -141,10 +141,11 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
             <div className="flex items-center gap-2">
               <Wifi size={12} className="text-accent" /> Prospect Mirror (Unlock)
             </div>
-            {currentLead && (
-  
+{currentLead && (
+  <a
     href={`/unlock?place_id=${encodeURIComponent(currentLead.kgmid ?? '')}&name=${encodeURIComponent(currentLead.businessName ?? '')}&address=${encodeURIComponent(currentLead.address ?? '')}&sessionId=${encodeURIComponent(currentLead.sessionId ?? '')}`}
     target="_blank"
+    rel="noreferrer"
     className="text-white/40 hover:text-white"
   >
     <ExternalLink size={12} />
