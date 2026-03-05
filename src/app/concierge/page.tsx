@@ -1,25 +1,61 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import type { NearbyPlace, PlaceDetails } from '@/lib/google-places';
-import type { ConciergeAnswers } from '@/lib/gemini-concierge';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { initializeApp, getApp, getApps } from 'firebase/app';
+import { getFirestore, doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { 
+  Lock, Search, TrendingUp, MapPin, ShieldCheck, 
+  Zap, Clock, ChevronDown, ChevronUp, Users, Star
+} from 'lucide-react';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// --- Types for Concierge ---
 interface Message {
-  id:       string;
-  role:     'bot' | 'user';
-  text:     string;
+  id: string;
+  role: 'bot' | 'user';
+  text: string;
   replies?: string[];
-  input?:   'location';
 }
 
-interface RecommendationResult {
-  place:   NearbyPlace;
-  reason:  string;
-}
+// --- Firebase Configuration & Prerender Safety ---
+const getFirebaseConfig = () => {
+  if (typeof __firebase_config !== 'undefined') {
+    try { return JSON.parse(__firebase_config); } catch (e) { return null; }
+  }
+  return null;
+};
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function getTimeOfDay(): 'morning' | 'lunch' | 'dinner' | 'late' {
+const getAppId = () => {
+  const rawId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+  return rawId.replace(/\//g, '_');
+};
+
+const initFirebase = () => {
+  const config = getFirebaseConfig();
+  if (!config) return { db: null, auth: null, appId: getAppId() };
+  const app = getApps().length > 0 ? getApp() : initializeApp(config);
+  return { db: getFirestore(app), auth: getAuth(app), appId: getAppId() };
+};
+
+const { db, auth, appId } = initFirebase();
+
+// --- Utility Helpers ---
+const fmt = (n) => (typeof n === 'number' ? n.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '0');
+const currency = (n) => `$${fmt(n)}`;
+const stars = (r) => {
+  const count = typeof r === 'number' ? Math.min(5, Math.max(0, Math.round(r))) : 0;
+  return '★'.repeat(count) + '☆'.repeat(5 - count);
+};
+
+// --- Concierge Helpers ---
+const MOOD_OPTIONS = {
+  morning: ['Coffee & Breakfast ☕', 'Brunch 🥂', 'Bakery 🥐', 'Quick Bite 🥪'],
+  lunch:   ['Quick Bite 🥪', 'Sit Down & Relax 🍽️', 'Something Light 🥗', 'Comfort Food 🍔'],
+  dinner:  ['Comfort Food 🍔', 'Something Special ✨', 'Quick & Easy ⚡', 'Date Night 🌹'],
+  late:    ['Late Night 🌙', 'Bar Food 🍻', 'Delivery 🛵', 'Quick Bite 🥪'],
+};
+
+function getTimeOfDay() {
   const h = new Date().getHours();
   if (h < 11) return 'morning';
   if (h < 14) return 'lunch';
@@ -27,419 +63,420 @@ function getTimeOfDay(): 'morning' | 'lunch' | 'dinner' | 'late' {
   return 'late';
 }
 
-const MOOD_OPTIONS: Record<string, string[]> = {
-  morning: ['Coffee & Breakfast ☕', 'Brunch 🥂', 'Bakery 🥐', 'Quick Bite 🥪'],
-  lunch:   ['Quick Bite 🥪', 'Sit Down & Relax 🍽️', 'Something Light 🥗', 'Comfort Food 🍔'],
-  dinner:  ['Comfort Food 🍔', 'Something Special ✨', 'Quick & Easy ⚡', 'Date Night 🌹'],
-  late:    ['Late Night 🌙', 'Bar Food 🍻', 'Delivery 🛵', 'Quick Bite 🥪'],
+// --- Sub-Components ---
+
+const ActivityPulse = () => (
+  <span className="relative flex h-2 w-2">
+    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+  </span>
+);
+
+const PhotoCarousel = ({ photos }) => {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    if (!photos || photos.length < 2) return;
+    const id = setInterval(() => setIdx(i => (i + 1) % photos.length), 3500);
+    return () => clearInterval(id);
+  }, [photos]);
+  if (!photos || !photos.length) return <div className="w-full h-44 bg-gray-800 rounded-2xl animate-pulse" />;
+  return (
+    <div className="relative w-full h-44 rounded-2xl overflow-hidden shadow-2xl">
+      {photos.map((p, i) => (
+        <img key={i} src={p.url} alt="" className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${i === idx ? 'opacity-100' : 'opacity-0'}`} />
+      ))}
+      <div className="absolute inset-0 bg-gradient-to-t from-gray-950/80 to-transparent" />
+    </div>
+  );
 };
 
-const CUISINE_OPTIONS = ['Pizza 🍕', 'Sushi 🍣', 'Mexican 🌮', 'Indian 🍛', 'Burgers 🍔', 'Thai 🍜', 'Italian 🍝', 'Surprise me ✨'];
-const DIETARY_OPTIONS = ['No restrictions 🍽️', 'Vegetarian 🥦', 'Vegan 🌱', 'Gluten-free 🌾', 'Halal ☪️', 'Kosher ✡️'];
-const VIBE_OPTIONS    = ['Casual & quick ⚡', 'Sit down & relax 😌', 'Date night 🌹', 'Family-friendly 👨‍👩‍👧', 'Solo, just me 🎧'];
-
-function uid() { return Math.random().toString(36).slice(2, 9); }
-
-function stars(rating?: number) {
-  if (!rating) return '';
-  return '★'.repeat(Math.round(rating)) + '☆'.repeat(5 - Math.round(rating));
-}
-
-function priceLabel(level?: number) {
-  return ['', '$', '$$', '$$$', '$$$$'][level ?? 1] ?? '$';
-}
-
-// ── Photo Carousel ────────────────────────────────────────────────────────────
-function PhotoCarousel({ photos }: { photos: { url: string }[] }) {
-  const [idx, setIdx] = useState(0);
-  if (!photos.length) return null;
+const CompetitorList = ({ title, count, items, color }) => {
+  const [open, setOpen] = useState(false);
   return (
-    <div className="relative w-full h-48 rounded-2xl overflow-hidden bg-gray-900">
-      <img src={photos[idx].url} alt="" className="w-full h-full object-cover" />
-      {photos.length > 1 && (
-        <>
-          <button onClick={() => setIdx(i => (i - 1 + photos.length) % photos.length)}
-            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full w-8 h-8 flex items-center justify-center text-lg hover:bg-black/70 transition">‹</button>
-          <button onClick={() => setIdx(i => (i + 1) % photos.length)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full w-8 h-8 flex items-center justify-center text-lg hover:bg-black/70 transition">›</button>
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
-            {photos.map((_, i) => (
-              <button key={i} onClick={() => setIdx(i)}
-                className={`w-1.5 h-1.5 rounded-full transition ${i === idx ? 'bg-white' : 'bg-white/40'}`} />
-            ))}
-          </div>
-        </>
+    <div className="border rounded-2xl overflow-hidden transition-all" style={{ borderColor: color + '40' }}>
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-4 py-4 text-left hover:brightness-110 transition-all" style={{ background: color + '10' }}>
+        <div className="flex items-center gap-3">
+          <div className="w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.5)]" style={{ background: color }} />
+          <span className="font-bold text-white text-sm tracking-tight">{title}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="font-mono font-bold text-sm" style={{ color }}>{count || 0} competitors</span>
+          {open ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-700" />}
+        </div>
+      </button>
+      {open && (
+        <div className="divide-y divide-gray-800 bg-gray-900/40 max-h-64 overflow-y-auto">
+          {!items || items.length === 0 ? (
+            <div className="px-4 py-4 text-gray-500 text-xs italic">No competitors identified in this ring.</div>
+          ) : (
+            items.map(c => (
+              <div key={c.placeId || Math.random()} className="px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors">
+                <div>
+                  <div className="text-white text-sm font-semibold">{c.name}</div>
+                  <div className="text-gray-500 text-[10px] uppercase tracking-wider">{c.category}</div>
+                </div>
+                <div className="text-right text-[10px] text-gray-400">
+                  <div className="text-amber-400 font-bold mb-0.5">{stars(c.rating)} {c.rating?.toFixed(1)}</div>
+                  {c.distanceMetres ? `${(c.distanceMetres / 1609.34).toFixed(1)}mi` : ''}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       )}
     </div>
   );
-}
+};
 
-// ── Result Card ───────────────────────────────────────────────────────────────
-function ResultCard({ details, recommendation }: { details: PlaceDetails; recommendation: RecommendationResult }) {
-  const topReview = details.reviews?.[0];
-  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination_place_id=${details.placeId}`;
-  const orderUrl = details.website ?? `https://www.google.com/search?q=${encodeURIComponent(details.name + ' order online')}`;
-
-  return (
-    <div className="bg-white rounded-3xl shadow-2xl overflow-hidden max-w-sm w-full mx-auto animate-slideUp">
-      <PhotoCarousel photos={details.photos} />
-
-      <div className="p-5 space-y-3">
-        {/* Header */}
-        <div>
-          <div className="flex items-start justify-between gap-2">
-            <h2 className="text-gray-900 font-bold text-xl leading-tight">{details.name}</h2>
-            <span className="text-xs font-bold bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full whitespace-nowrap">
-              {priceLabel(details.priceLevel)}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-amber-400 text-sm">{stars(details.rating)}</span>
-            <span className="text-gray-500 text-xs">{details.rating?.toFixed(1)} ({details.totalRatings?.toLocaleString()} reviews)</span>
-          </div>
-          <p className="text-gray-400 text-xs mt-0.5 truncate">{details.address}</p>
-        </div>
-
-        {/* Gemini pick reason */}
-        <div className="bg-indigo-50 rounded-xl p-3">
-          <p className="text-indigo-700 text-sm leading-relaxed">
-            <span className="font-bold">✨ Why you'll love it: </span>
-            {recommendation.reason}
-          </p>
-        </div>
-
-        {/* What locals are saying */}
-        {topReview && (
-          <div className="bg-gray-50 rounded-xl p-3">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">What locals are saying</p>
-            <p className="text-gray-600 text-sm leading-relaxed italic">
-              "{topReview.text.slice(0, 140)}{topReview.text.length > 140 ? '…' : ''}"
-            </p>
-            <p className="text-gray-400 text-xs mt-1.5">— {topReview.authorName} · {topReview.relativeTime}</p>
-          </div>
-        )}
-
-        {/* Action buttons */}
-        <div className="grid grid-cols-3 gap-2 pt-1">
-          {details.phone && (
-            <a href={`tel:${details.phone}`}
-              className="flex flex-col items-center gap-1 bg-emerald-500 text-white rounded-xl py-2.5 px-1 text-xs font-bold hover:bg-emerald-600 transition">
-              <span className="text-lg">📞</span>
-              Call Now
-            </a>
-          )}
-          <a href={orderUrl} target="_blank" rel="noopener noreferrer"
-            className="flex flex-col items-center gap-1 bg-orange-500 text-white rounded-xl py-2.5 px-1 text-xs font-bold hover:bg-orange-600 transition">
-            <span className="text-lg">🛵</span>
-            Order Now
-          </a>
-          <a href={directionsUrl} target="_blank" rel="noopener noreferrer"
-            className="flex flex-col items-center gap-1 bg-blue-500 text-white rounded-xl py-2.5 px-1 text-xs font-bold hover:bg-blue-600 transition">
-            <span className="text-lg">🗺️</span>
-            Directions
-          </a>
-        </div>
-
-        {/* Sign-off */}
-        <p className="text-center text-gray-400 text-sm pt-1">
-          Enjoy your meal! 🍽️
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ── Typewriter effect ─────────────────────────────────────────────────────────
-function TypewriterText({ text, onDone }: { text: string; onDone?: () => void }) {
-  const [displayed, setDisplayed] = useState('');
-  const [done, setDone]           = useState(false);
-
-  useEffect(() => {
-    setDisplayed('');
-    setDone(false);
-    let i = 0;
-    const id = setInterval(() => {
-      i++;
-      setDisplayed(text.slice(0, i));
-      if (i >= text.length) {
-        clearInterval(id);
-        setDone(true);
-        onDone?.();
-      }
-    }, 18);
-    return () => clearInterval(id);
-  }, [text, onDone]);
-
-  return <span>{displayed}{!done && <span className="animate-pulse">▌</span>}</span>;
-}
-
-// ── Chat Bubble ───────────────────────────────────────────────────────────────
-function BotBubble({ text, animate, onDone }: { text: string; animate?: boolean; onDone?: () => void }) {
-  return (
-    <div className="flex items-end gap-2 max-w-[85%]">
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm flex-shrink-0 mb-1">🍽️</div>
-      <div className="bg-white rounded-2xl rounded-bl-sm shadow-sm px-4 py-3 text-gray-800 text-sm leading-relaxed">
-        {animate ? <TypewriterText text={text} onDone={onDone} /> : text}
-      </div>
-    </div>
-  );
-}
-
-function UserBubble({ text }: { text: string }) {
-  return (
-    <div className="flex justify-end">
-      <div className="bg-indigo-600 text-white rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[75%]">
-        {text}
-      </div>
-    </div>
-  );
-}
-
-// ── Quick Reply Chips ─────────────────────────────────────────────────────────
-function QuickReplies({ options, onSelect }: { options: string[]; onSelect: (v: string) => void }) {
-  return (
-    <div className="flex flex-wrap gap-2 mt-2 ml-10">
-      {options.map(opt => (
-        <button key={opt} onClick={() => onSelect(opt)}
-          className="bg-white border border-indigo-200 text-indigo-700 rounded-full px-3 py-1.5 text-sm font-medium hover:bg-indigo-50 hover:border-indigo-400 transition-all active:scale-95">
-          {opt}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ── Main Concierge ────────────────────────────────────────────────────────────
-export default function ConciergePage() {
-  const [messages, setMessages]         = useState<Message[]>([]);
-  const [awaitingReply, setAwaiting]    = useState(false);
-  const [step, setStep]                 = useState(0);
-  const [answers, setAnswers]           = useState<Partial<ConciergeAnswers>>({});
-  const [location, setLocation]         = useState<{ lat: number; lng: number } | null>(null);
-  const [locationError, setLocError]    = useState('');
-  const [loading, setLoading]           = useState(false);
-  const [result, setResult]             = useState<{ recommendation: RecommendationResult; details: PlaceDetails } | null>(null);
+// --- Concierge Demo Component ---
+const ConciergeDemo = ({ business }) => {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [step, setStep] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const addBot = useCallback((text: string, replies?: string[], animate = true) => {
-    const msg: Message = { id: uid(), role: 'bot', text, replies };
-    setMessages(prev => [...prev, msg]);
-    setAwaiting(!!replies);
-    return msg.id;
+  const addBot = useCallback((text: string, replies?: string[]) => {
+    setMessages(prev => [...prev, { id: Math.random().toString(), role: 'bot', text, replies }]);
   }, []);
 
-  const addUser = useCallback((text: string) => {
-    setMessages(prev => [...prev, { id: uid(), role: 'user', text }]);
-    setAwaiting(false);
-  }, []);
+  const addUser = (text: string) => {
+    setMessages(prev => [...prev, { id: Math.random().toString(), role: 'user', text }]);
+  };
 
-  // Scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, result]);
+  }, [messages]);
 
-  // Start the flow
   useEffect(() => {
-    setTimeout(() => {
-      addBot("Hi! 👋 I'm your personal dining concierge. I'll find you the perfect spot nearby in just a few questions.", undefined, true);
-    }, 400);
-    setTimeout(() => {
-      addBot('First — can I get your location so I know what\'s near you?', undefined, false);
-      setStep(1);
-    }, 2200);
-  }, [addBot]);
-
-  // Request geolocation
-  useEffect(() => {
-    if (step !== 1) return;
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setTimeout(() => {
-          const tod = getTimeOfDay();
-          addBot(`Got it! 📍 What are you in the mood for ${tod === 'morning' ? 'this morning' : tod === 'lunch' ? 'for lunch' : tod === 'dinner' ? 'tonight' : 'tonight'}?`,
-            MOOD_OPTIONS[tod]);
-          setStep(2);
-        }, 600);
-      },
-      () => {
-        setLocError('Location access denied');
-        addBot('No worries! Could you type your address or intersection so I can find places near you?');
-        setStep(1.5);
-      },
-    );
-  }, [step, addBot]);
-
-  const handleReply = useCallback(async (value: string) => {
-    addUser(value);
-    const next = { ...answers };
-
-    if (step === 2) {
-      next.mood = value;
-      setAnswers(next);
-      // Ask travel mode
+    if (step === 0 && business) {
       setTimeout(() => {
-        addBot('How are you getting there?', ['Walking 🚶', 'Driving 🚗', 'Delivery 🛵']);
-        setStep(3);
-      }, 400);
-
-    } else if (step === 3) {
-      const mode = value.toLowerCase().includes('walk') ? 'walk'
-                 : value.toLowerCase().includes('driv') ? 'drive'
-                 : 'delivery';
-      next.travelMode = mode;
-      setAnswers(next);
-
-      setTimeout(() => {
-        if (mode === 'walk') {
-          addBot('How far are you walking tonight?', ['5 minutes 🚶', '10 minutes 🏃', '20 minutes 👟']);
-        } else if (mode === 'drive') {
-          addBot('How far are you willing to drive?', ['1 mile 🚗', '3 miles 🚗💨', '5 miles 🛣️']);
-        } else {
-          // Delivery — no distance question
-          next.travelRange = '3';
-          setAnswers(next);
-          addBot('Staying in tonight — good call! 🛵 Any cuisine in particular?', CUISINE_OPTIONS);
-          setStep(5);
-          return;
-        }
-        setStep(4);
-      }, 400);
-
-    } else if (step === 4) {
-      // Extract number from "10 minutes" or "3 miles"
-      const num = value.match(/\d+/)?.[0] ?? '3';
-      next.travelRange = num;
-      setAnswers(next);
-      setTimeout(() => {
-        addBot('Any cuisine in particular?', CUISINE_OPTIONS);
-        setStep(5);
-      }, 400);
-
-    } else if (step === 5) {
-      next.cuisine = value.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
-      setAnswers(next);
-      setTimeout(() => {
-        addBot('Anything to keep in mind?', DIETARY_OPTIONS);
-        setStep(6);
-      }, 400);
-
-    } else if (step === 6) {
-      next.dietary = value.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
-      setAnswers(next);
-      setTimeout(() => {
-        addBot('Last one — what\'s the vibe tonight?', VIBE_OPTIONS);
-        setStep(7);
-      }, 400);
-
-    } else if (step === 7) {
-      next.vibe = value.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
-      setAnswers(next);
-      setStep(8);
-
-      // Find restaurants
-      setTimeout(async () => {
-        addBot('Perfect! Let me find your ideal spot... 🔍');
-        setLoading(true);
-
-        try {
-          const travelMode  = next.travelMode ?? 'walk';
-          const travelRange = next.travelRange ?? '10';
-
-          // Fetch nearby places
-          const nearbyRes = await fetch('/api/concierge/nearby', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              lat: location!.lat, lng: location!.lng,
-              travelMode, travelRange,
-              cuisine: next.cuisine !== 'Surprise me' ? next.cuisine : undefined,
-            }),
-          });
-          const { places } = await nearbyRes.json();
-
-          if (!places?.length) {
-            addBot("Hmm, I couldn't find any matching restaurants right now. Try expanding your search radius or changing the cuisine!");
-            setLoading(false);
-            return;
-          }
-
-          // Get Gemini recommendation
-          const recRes = await fetch('/api/concierge/recommend', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ answers: next, candidates: places }),
-          });
-          const data = await recRes.json();
-
-          setResult(data);
-          addBot(`Found it! Here's your perfect match for tonight 🎯`);
-        } catch {
-          addBot('Oops — something went wrong. Please try again!');
-        } finally {
-          setLoading(false);
-        }
+        addBot(`Hi! 👋 I'm the dining concierge for this neighborhood.`);
       }, 500);
+      setTimeout(() => {
+        addBot(`I've pre-loaded your location at ${business.address.split(',')[0]} 📍`);
+      }, 1800);
+      setTimeout(() => {
+        const tod = getTimeOfDay();
+        addBot(`What are you in the mood for ${tod === 'dinner' ? 'tonight' : 'today'}?`, MOOD_OPTIONS[tod]);
+        setStep(1);
+      }, 3000);
     }
-  }, [step, answers, location, addBot, addUser]);
+  }, [step, business, addBot]);
+
+  const handleReply = (opt: string) => {
+    addUser(opt);
+    setTimeout(() => {
+      addBot(`Perfect choice. I'm searching for the highest rated ${opt.split(' ')[0]} spots within walking distance... 🔍`);
+    }, 600);
+    setTimeout(() => {
+      addBot(`Found it! Based on live local data, the top recommendation for this area is actually one of your competitors.`);
+    }, 2500);
+    setTimeout(() => {
+      addBot(`(In the full version, we'd route this customer directly to YOU instead) 🎯`);
+    }, 4500);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex flex-col">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-lg">🍽️</div>
+    <div className="bg-white rounded-[32px] h-[500px] flex flex-col shadow-2xl overflow-hidden border border-gray-100">
+      <div className="p-4 border-b border-gray-100 flex items-center gap-3 bg-gray-50/50">
+        <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs">🍽️</div>
         <div>
-          <div className="font-bold text-gray-900 text-sm">AgenticLife Concierge</div>
-          <div className="text-gray-400 text-xs flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
-            Online now
-          </div>
+          <div className="text-[11px] font-black text-gray-900 uppercase tracking-tighter">Local Concierge</div>
+          <div className="text-[9px] text-emerald-500 font-bold flex items-center gap-1"><span className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse" /> Live in your zone</div>
         </div>
       </div>
-
-      {/* Chat area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 pb-32">
-        {messages.map((msg, i) => (
-          <div key={msg.id} className="animate-slideUp">
-            {msg.role === 'bot' ? (
-              <>
-                <BotBubble
-                  text={msg.text}
-                  animate={i === messages.length - 1 && msg.role === 'bot'}
-                  onDone={() => {}}
-                />
-                {msg.replies && awaitingReply && i === messages.length - 1 && (
-                  <QuickReplies options={msg.replies} onSelect={handleReply} />
-                )}
-              </>
-            ) : (
-              <UserBubble text={msg.text} />
-            )}
-          </div>
-        ))}
-
-        {/* Loading dots */}
-        {loading && (
-          <div className="flex items-end gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm flex-shrink-0">🍽️</div>
-            <div className="bg-white rounded-2xl rounded-bl-sm shadow-sm px-4 py-3 flex gap-1 items-center">
-              {[0, 1, 2].map(i => (
-                <div key={i} className="w-2 h-2 rounded-full bg-indigo-300 animate-bounce"
-                  style={{ animationDelay: `${i * 0.15}s` }} />
-              ))}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map(m => (
+          <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed ${
+              m.role === 'user' ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-gray-100 text-gray-800 rounded-bl-sm'
+            }`}>
+              {m.text}
+              {m.replies && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {m.replies.map(r => (
+                    <button key={r} onClick={() => handleReply(r)} className="bg-white border border-indigo-200 text-indigo-600 px-2 py-1 rounded-lg font-bold hover:bg-indigo-50 transition-all">{r}</button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-        )}
-
-        {/* Result card */}
-        {result && (
-          <div className="mt-4 animate-slideUp">
-            <ResultCard details={result.details} recommendation={result.recommendation} />
-          </div>
-        )}
-
+        ))}
         <div ref={bottomRef} />
       </div>
     </div>
   );
-}
+};
+
+// --- Pricing & ROI Helpers ---
+const TICKET_OPTIONS = [
+  { label: 'Fast Casual', range: '$12–18', value: 15 },
+  { label: 'Casual Dining', range: '$22–35', value: 28 },
+  { label: 'Polished Casual', range: '$35–55', value: 45 },
+  { label: 'Fine Dining', range: '$65+', value: 75 },
+];
+
+const ROIBadge = ({ roi }) => (
+  <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-4 space-y-3">
+    <div className="flex items-center gap-2">
+      <TrendingUp className="w-4 h-4 text-emerald-400" />
+      <span className="text-emerald-400 font-bold text-[10px] uppercase tracking-[0.2em]">ROI Projection</span>
+    </div>
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <div className="text-white font-black text-2xl tracking-tighter">{roi?.roiMultiple || 0}×</div>
+        <div className="text-gray-500 text-[10px] uppercase font-bold tracking-wider">Annual Return</div>
+      </div>
+      <div>
+        <div className="text-white font-black text-2xl tracking-tighter">{currency(roi?.newRevenuePerYear || 0)}</div>
+        <div className="text-gray-500 text-[10px] uppercase font-bold tracking-wider">New Rev/Yr</div>
+      </div>
+    </div>
+  </div>
+);
+
+// --- MAIN APPLICATION ---
+
+const App = () => {
+  const [params, setParams] = useState(null);
+  const [user, setUser] = useState(null);
+  const [business, setBusiness] = useState(null);
+  const [competitors, setCompetitors] = useState({ tier1: [], tier2: [], tier3: [] });
+  const [counts, setCounts] = useState({ tier1: 0, tier2: 0, tier3: 0 });
+  const [pricings, setPricings] = useState(null);
+  const [category, setCategory] = useState('Restaurant');
+  const [avgTicket, setAvgTicket] = useState(28);
+  const [loading, setLoading] = useState(true);
+  const [lockSuccess, setLockSuccess] = useState(false);
+  const scrollRef = useRef(0);
+
+  // 1. Firebase Memo
+  const services = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    return initFirebase();
+  }, []);
+
+  // 2. Initial Config
+  useEffect(() => {
+    if (typeof window !== 'undefined') setParams(new URLSearchParams(window.location.search));
+    if (services?.auth) {
+      const initAuth = async () => {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(services.auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(services.auth);
+        }
+      };
+      initAuth();
+      return onAuthStateChanged(services.auth, setUser);
+    }
+  }, [services]);
+
+  // 3. Fetch Lead & Competition
+  useEffect(() => {
+    const placeId = params?.get('place_id');
+    if (!placeId) return;
+
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/competition?place_id=${encodeURIComponent(placeId)}&category=${encodeURIComponent(category)}`);
+        const data = await res.json();
+        const bData = data.business || data.lead;
+        if (bData) {
+          setBusiness(bData);
+          setCompetitors(data.competitors || { tier1: [], tier2: [], tier3: [] });
+          setCounts(data.counts || { tier1: 0, tier2: 0, tier3: 0 });
+        }
+      } catch (e) {
+        console.error("Fetch fail:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [params, category]);
+
+  // 4. ROI Sync
+  useEffect(() => {
+    if (!counts?.tier1) return;
+    fetch('/api/pricing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        competitorCounts: { tier1: counts.tier1, tier2: (counts.tier2 || 0) - (counts.tier1 || 0), tier3: (counts.tier3 || 0) - (counts.tier2 || 0) },
+        avgTicket,
+      }),
+    })
+      .then(r => r.json())
+      .then(d => setPricings(d.pricings))
+      .catch(() => {});
+  }, [counts, avgTicket]);
+
+  // 5. Live Mirror Logic
+  useEffect(() => {
+    if (!user || !services || !params) return;
+    const sessionId = params.get('sessionId') || 'demo-session';
+    const isMirror = params.get('mirror') === 'true';
+    const stateDoc = doc(services.db, 'artifacts', services.appId, 'public', 'data', 'sync_states', sessionId);
+    
+    const unsub = onSnapshot(stateDoc, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.category && data.category !== category) setCategory(data.category);
+        if (data.avgTicket && data.avgTicket !== avgTicket) setAvgTicket(data.avgTicket);
+        if (isMirror && typeof data.scrollPos === 'number') {
+          window.scrollTo({ top: data.scrollPos, behavior: 'smooth' });
+        }
+        if (data.lockSuccess) setLockSuccess(true);
+      }
+    });
+
+    const handleScroll = () => {
+      if (isMirror) return;
+      const pos = window.scrollY;
+      if (Math.abs(pos - scrollRef.current) > 100) {
+        scrollRef.current = pos;
+        updateDoc(stateDoc, { scrollPos: pos }).catch(() => setDoc(stateDoc, { scrollPos: pos, category, avgTicket }, { merge: true }));
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => { unsub(); window.removeEventListener('scroll', handleScroll); };
+  }, [user, services, params, category, avgTicket]);
+
+  if (loading && !business) {
+    return (
+      <div className="min-h-screen bg-[#060810] flex flex-col items-center justify-center">
+        <Zap className="w-12 h-12 text-indigo-500 animate-pulse mb-4" />
+        <div className="w-48 h-1 bg-gray-900 rounded-full overflow-hidden">
+          <div className="h-full bg-indigo-500 animate-[loading_2s_infinite]" />
+        </div>
+      </div>
+    );
+  }
+
+  const isMirror = params?.get('mirror') === 'true';
+
+  return (
+    <div className="min-h-screen bg-[#060810] text-gray-100 font-sans pb-32">
+      <header className="bg-gray-900/80 border-b border-gray-800 px-6 py-5 sticky top-0 z-50 backdrop-blur-xl flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <Zap className="w-6 h-6 text-indigo-500 fill-indigo-500" />
+          <span className="font-black tracking-tighter text-xl uppercase italic">Agentic<span className="text-indigo-500">Life</span></span>
+        </div>
+        <div className="flex items-center gap-4">
+          {isMirror && <div className="bg-red-600 text-[9px] font-black px-3 py-1 rounded-full animate-pulse flex items-center gap-2 shadow-lg shadow-red-900/40"><ActivityPulse /> PROSPECT MIRROR</div>}
+          <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2"><Clock className="w-3 h-3" /> Secure Session Active</div>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 py-8 lg:py-12">
+        <div className="flex flex-col lg:flex-row gap-12">
+          
+          {/* LEFT: Context Column */}
+          <div className="w-full lg:w-[420px] space-y-10 flex-shrink-0">
+            <div className="space-y-4">
+               <div className="inline-block px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[9px] font-black uppercase tracking-widest">Exclusive Territory Scan</div>
+               <h2 className="text-4xl font-black text-white italic tracking-tighter leading-none">{business?.name || business?.businessName}</h2>
+               <p className="text-gray-500 text-xs font-bold leading-relaxed">{business?.address}</p>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-600">The Customer Experience</h3>
+              <ConciergeDemo business={business} />
+              <p className="text-[10px] text-gray-500 italic text-center leading-relaxed px-4">
+                "When a customer asks for a recommendation at this address, our network either routes them to a competitor, or directly to you."
+              </p>
+            </div>
+
+            <div className="bg-gray-900/50 border border-gray-800 rounded-[32px] p-6">
+               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-6">Refine Industry Filter</h3>
+               <div className="grid grid-cols-2 gap-2">
+                  {['Restaurant', 'Pizza', 'Sushi', 'Cafe', 'Bar', 'Bakery'].map(cat => (
+                    <button key={cat} onClick={() => setCategory(cat)} className={`py-3 px-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${category === cat ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-900/40' : 'bg-gray-800/40 border-gray-700 text-gray-500 hover:border-gray-500'}`}>{cat}</button>
+                  ))}
+               </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-600">Proximity Threats</h3>
+              <CompetitorList title="Zone 1 — Walk Score" count={counts.tier1} items={competitors.tier1} color="#38bdf8" />
+              <CompetitorList title="Zone 2 — Drive Score" count={counts.tier2} items={competitors.tier2} color="#818cf8" />
+              <CompetitorList title="Zone 3 — Market Share" count={counts.tier3} items={competitors.tier3} color="#fbbf24" />
+            </div>
+          </div>
+
+          {/* RIGHT: ROI & Action Column */}
+          <div className="flex-1 space-y-12">
+            <div className="space-y-8">
+              <div>
+                <h3 className="text-4xl font-black text-white italic tracking-tighter mb-4">Dominance Projection</h3>
+                <p className="text-gray-400 text-sm leading-relaxed max-w-xl">
+                  By locking your category, you become the exclusive recommendation in these rings. We've analyzed {counts.tier3} nearby competitors to project your break-even point.
+                </p>
+              </div>
+
+              <div className="bg-gray-900/30 border border-gray-800 p-8 rounded-[40px] space-y-8">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <h4 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500">Average Ticket Size</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {TICKET_OPTIONS.map(t => (
+                      <button key={t.value} onClick={() => setAvgTicket(t.value)} className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase border transition-all ${avgTicket === t.value ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/40' : 'bg-[#060810] border-gray-800 text-gray-600 hover:border-gray-600'}`}>{t.label}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {pricings ? pricings.map(tp => (
+                    <div key={tp.tier.id} className="bg-[#060810] border border-gray-800 rounded-3xl p-6 flex flex-col hover:border-gray-700 transition-all group">
+                       <div className="mb-6">
+                          <h5 className="text-white font-black italic tracking-tighter uppercase text-lg">{tp.tier.name}</h5>
+                          <p className="text-gray-600 text-[9px] font-black uppercase tracking-widest">{tp.tier.tagline}</p>
+                       </div>
+                       <ROIBadge roi={tp.roi} />
+                       <div className="mt-8 space-y-4">
+                          <div className="flex items-end justify-between">
+                             <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Annual Price</span>
+                             <span className="text-2xl font-black text-white tracking-tighter">{currency(tp.annualPrice)}</span>
+                          </div>
+                          <button className="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-lg shadow-indigo-900/20">🔒 Lock Zone</button>
+                       </div>
+                    </div>
+                  )) : (
+                    [1,2,3].map(i => <div key={i} className="h-64 bg-gray-900/50 rounded-3xl animate-pulse" />)
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-gray-900/50 to-indigo-950/20 border border-gray-800 rounded-[32px] p-8">
+               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 mb-8">Competitive Advantage</h3>
+               <div className="grid md:grid-cols-2 gap-10">
+                  {[
+                    { icon: ShieldCheck, title: 'Total Exclusivity', desc: 'Category lock is strictly limited to one business per zone for 12 months.' },
+                    { icon: Zap, title: 'Peak Intent Intercept', desc: 'Directly capturing customers at the exact moment of decision making.' },
+                    { icon: Users, title: 'Viral Distribution', desc: 'Your recommendation propagates across the entire Agentic Concierge network.' },
+                    { icon: TrendingUp, title: 'Fixed ROI Protection', desc: 'Stop bidding against competitors. One zone, one price, guaranteed reach.' }
+                  ].map(item => (
+                    <div key={item.title} className="flex gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center flex-shrink-0"><item.icon className="w-6 h-6 text-indigo-400" /></div>
+                      <div>
+                        <h4 className="text-white font-bold text-sm mb-1 italic uppercase tracking-tight">{item.title}</h4>
+                        <p className="text-gray-500 text-xs leading-relaxed">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <style>{`
+        @keyframes loading { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+        .animate-fadeIn { animation: fadeIn 0.4s ease-out forwards; }
+      `}</style>
+    </div>
+  );
+};
+
+export default App;
