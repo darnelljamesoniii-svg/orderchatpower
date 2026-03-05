@@ -15,10 +15,10 @@ export async function POST(req: Request) {
     const { agentId, status } = await req.json();
     if (!agentId) return NextResponse.json({ error: 'agentId required' }, { status: 400 });
 
-    await adminDb.collection(COLLECTIONS.AGENTS).doc(agentId).update({
-      lastActiveAt: new Date().toISOString(),
-      ...(status ? { status } : {}),
-    });
+    await adminDb.collection(COLLECTIONS.AGENTS).doc(agentId).set({
+  lastActiveAt: new Date().toISOString(),
+  ...(status ? { status } : {}),
+}, { merge: true });
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
@@ -36,11 +36,11 @@ export async function DELETE(req: Request) {
     const agentId = searchParams.get('agentId');
     if (!agentId) return NextResponse.json({ error: 'agentId required' }, { status: 400 });
 
-    await adminDb.collection(COLLECTIONS.AGENTS).doc(agentId).update({
-      status:        'OFFLINE',
-      currentLeadId: null,
-      lastActiveAt:  new Date().toISOString(),
-    });
+    await adminDb.collection(COLLECTIONS.AGENTS).doc(agentId).set({
+  status:        'OFFLINE',
+  currentLeadId: null,
+  lastActiveAt:  new Date().toISOString(),
+}, { merge: true });
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
