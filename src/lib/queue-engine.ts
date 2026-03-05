@@ -1,5 +1,4 @@
 import { getAdminDb } from '@/lib/firebase-admin';
-const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
 import { FieldValue } from 'firebase-admin/firestore';
 import { v4 as uuidv4 } from 'uuid';
@@ -18,7 +17,7 @@ function isInCallingWindow(lead: Lead, wave: CampaignWave): boolean {
   return h >= wave.startHourLocal && h < wave.endHourLocal;
 }
 
-async function isAgentOnline(agentId: string): Promise<boolean> {
+async function isAgentOnline(adminDb: FirebaseFirestore.Firestore, agentId: string): Promise<boolean> {
   const snap = await adminDb.collection(COLLECTIONS.AGENTS).doc(agentId).get();
   if (!snap.exists) return false;
   const data  = snap.data()!;
@@ -28,13 +27,32 @@ async function isAgentOnline(agentId: string): Promise<boolean> {
 }
 
 export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
+  const adminDb = getAdminDb();
+  if (!adminDb) {
+    return { lead: null, queueDepth: 0, message: 'Firebase Admin not initialized.' };
+  }
+
   const leadsRef = adminDb.collection(COLLECTIONS.LEADS);
   const now      = new Date();
   const nowIso   = now.toISOString();
 
-  const campaignSnap    = await adminDb.collection(COLLECTIONS.CAMPAIGNS).where('isActive', '==', true).get();
-  const activeCampaigns = campaignSnap.docs.map(d => d.data() as CampaignWave);
-  if (!activeCampaigns.length) return { lead: null, queueDepth: 0, message: 'No active campaigns.' };
+  const campaignSnap = await adminDb
+    .collection(COLLECTIONS.CAMPAIGNS)
+    .where('isActive', '==', true)
+    .get();
+
+  // IMPORTANT: include the doc id (d.data() does not contain it)
+  const activeCampaigns = campaignSnap.docs.map(d => ({
+    id: d.id,
+    ...(d.data() as Omit<CampaignWave, 'id'>),
+  })) as CampaignWave[];
+
+  // If you truly want to block dialing when there are no campaigns, keep this.
+  // If you want the dialer to still run, remove this early return.
+  if (!activeCampaigns.length) {
+    const remaining = await leadsRef.where('status', 'in', ['NEW', 'CALLBACK_MANUAL', 'CALLBACK_AUTO']).count().get();
+    return { lead: null, queueDepth: remaining.data().count, message: 'No active campaigns.' };
+  }
 
   // ── Priority 1: Agent-owned callbacks that are due ────────────────────────
   const ownedSnap = await leadsRef
@@ -59,10 +77,10 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
     orphanSnap.docs
       .filter(d => d.data().ownerAgentId && d.data().ownerAgentId !== agentId)
       .map(async d => {
-        const online = await isAgentOnline(d.data().ownerAgentId);
+        const online = await isAgentOnline(adminDb, d.data().ownerAgentId);
         return online ? null : d;
       })
-  )).filter(Boolean);
+  )).filter(Boolean) as FirebaseFirestore.QueryDocumentSnapshot[];
 
   // ── Priority 3: Auto callbacks ────────────────────────────────────────────
   const autoSnap = await leadsRef
@@ -73,13 +91,25 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
     .get();
 
   // ── Priority 4: Fresh NEW leads ───────────────────────────────────────────
-  const activeCampaignIds = activeCampaigns.map(c => c.id);
-  const newSnap = await leadsRef
-    .where('status', '==', 'NEW')
-    .where('campaign', 'in', activeCampaignIds)
-    .orderBy('createdAt', 'asc')
-    .limit(50)
-    .get();
+  const activeCampaignIds = activeCampaigns.map(c => c.id).filter(Boolean);
+
+  // CRITICAL FIX: "IN requires a non-empty ArrayValue"
+  let newSnap: FirebaseFirestore.QuerySnapshot;
+  if (activeCampaignIds.length > 0) {
+    newSnap = await leadsRef
+      .where('status', '==', 'NEW')
+      .where('campaign', 'in', activeCampaignIds)
+      .orderBy('createdAt', 'asc')
+      .limit(50)
+      .get();
+  } else {
+    // Fallback: still allow dialing NEW leads if campaigns exist but ids somehow missing
+    newSnap = await leadsRef
+      .where('status', '==', 'NEW')
+      .orderBy('createdAt', 'asc')
+      .limit(50)
+      .get();
+  }
 
   const waveMap  = Object.fromEntries(activeCampaigns.map(c => [c.id, c]));
   const newLeads = newSnap.docs
@@ -91,7 +121,7 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
     ...ownedSnap.docs,
     ...orphans,
     ...autoSnap.docs,
-    ...newLeads.map(l => ({ id: l.id, data: () => l, exists: true })),
+    ...newLeads.map(l => ({ id: l.id, data: () => l, exists: true } as unknown as FirebaseFirestore.DocumentSnapshot)),
   ] as FirebaseFirestore.DocumentSnapshot[];
 
   if (!candidates.length) {
@@ -128,11 +158,20 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
           updatedAt:       nowIso,
         });
 
-        return { ...data, id: snap.id, status: 'IN_PROGRESS', assignedAgentId: agentId, lockedUntil: lockExpiry, sessionId };
+        return {
+          ...data,
+          id: snap.id,
+          status: 'IN_PROGRESS',
+          assignedAgentId: agentId,
+          lockedUntil: lockExpiry,
+          sessionId,
+        };
       });
 
       if (lockedLead) break;
-    } catch { continue; }
+    } catch {
+      continue;
+    }
   }
 
   const remaining = await leadsRef.where('status', 'in', ['NEW', 'CALLBACK_MANUAL', 'CALLBACK_AUTO']).count().get();
@@ -148,6 +187,9 @@ export async function applyDisposition(
   callbackDueAt?:  string,
   callbackNote?:   string,
 ): Promise<void> {
+  const adminDb = getAdminDb();
+  if (!adminDb) throw new Error('Firebase Admin not initialized.');
+
   const docRef = adminDb.collection(COLLECTIONS.LEADS).doc(leadId);
   const now    = new Date();
   const nowIso = now.toISOString();
@@ -204,4 +246,3 @@ export async function applyDisposition(
 
   await docRef.update(updates);
 }
-
