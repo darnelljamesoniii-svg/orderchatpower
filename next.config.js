@@ -1,13 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: [
-      'firebase-admin',
-      '@signalwire/compatibility-api',
-      'lodash',
-    ],
-  },
+  serverExternalPackages: [
+    'firebase-admin',
+    '@signalwire/compatibility-api',
+    'lodash',
+  ],
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
 };
+
 module.exports = nextConfig;
