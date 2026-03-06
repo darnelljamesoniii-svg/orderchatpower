@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildOutboundLaML, validateSignalWireSignature } from '@/lib/signalwire-server';
+import { buildOutboundLaML } from '@/lib/signalwire-server';
+import { validateSignalWireSignature } from '@/lib/signalwire-signature';
 
 export const dynamic = 'force-dynamic';
 
