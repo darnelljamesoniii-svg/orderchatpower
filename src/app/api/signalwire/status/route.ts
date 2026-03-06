@@ -4,7 +4,7 @@ import { getAdminDb } from '@/lib/firebase-admin';
 export const runtime = 'nodejs';
 const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
-import { validateSignalWireSignature } from '@/lib/signalwire-server';
+import { validateSignalWireSignature } from '@/lib/signalwire-signature';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
