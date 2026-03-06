@@ -1,62 +1,51 @@
 import { RestClient } from '@signalwire/compatibility-api';
 
-let _client: RestClient | null = null;
-
-function normalizeSpaceHost(raw: string): string {
-  // Accepts:
-  // - "https://orderchat.signalwire.com"
-  // - "orderchat.signalwire.com"
-  // and returns:
-  // - "orderchat.signalwire.com"
-  let s = (raw ?? '').trim();
-  s = s.replace(/^https?:\/\//i, '');
-  s = s.replace(/^\/+/, '');
-  s = s.replace(/\/+$/, '');
-  return s;
-}
-
-function requiredEnv(name: string): string {
-  const v = process.env[name]?.trim();
-  if (!v) throw new Error(`Missing ${name}`);
+function must(name: string, val?: string) {
+  const v = (val ?? '').trim();
+  if (!v) throw new Error(`Missing env: ${name}`);
   return v;
 }
 
-export function getSwClient(): RestClient {
-  if (_client) return _client;
+function normalizeE164(raw: string): string {
+  let s = (raw ?? '').trim();
+  // remove spaces/parens/dashes
+  s = s.replace(/[^\d+]/g, '');
+  // if it somehow came without +, assume US number (you can adjust)
+  if (!s.startsWith('+') && /^\d{10,15}$/.test(s)) s = `+${s}`;
+  return s;
+}
 
-  const projectId = requiredEnv('SIGNALWIRE_PROJECT_ID');
-  const token     = requiredEnv('SIGNALWIRE_API_TOKEN');
+export function getSwClient() {
+  const project = must('SIGNALWIRE_PROJECT_ID', process.env.SIGNALWIRE_PROJECT_ID);
+  const token   = must('SIGNALWIRE_API_TOKEN', process.env.SIGNALWIRE_API_TOKEN);
 
-  // Your value can be "https://orderchat.signalwire.com" (you said it is)
-  const spaceRaw  =
-    process.env.SIGNALWIRE_SPACE_URL?.trim() ||
-    process.env.SIGNALWIRE_SPACE?.trim() ||
-    '';
+  // IMPORTANT: must be like: https://orderchat.signalwire.com
+  const spaceUrl = must('SIGNALWIRE_SPACE_URL', process.env.SIGNALWIRE_SPACE_URL);
 
-  const signalwireSpaceUrl = normalizeSpaceHost(spaceRaw);
-  if (!signalwireSpaceUrl) throw new Error('Missing SIGNALWIRE_SPACE_URL (e.g. https://orderchat.signalwire.com)');
+  // Guard against the exact bug you hit: "https://https//..."
+  const fixedSpaceUrl = spaceUrl
+    .replace(/^https:\/\/https\/\//, 'https://')
+    .replace(/^https:\/\/https:\/\//, 'https://');
 
-  _client = new RestClient(projectId, token, { signalwireSpaceUrl });
-  return _client;
+  return new RestClient(project, token, { signalwireSpaceUrl: fixedSpaceUrl });
 }
 
 export function getFromNumber(): string {
-  // E.164 preferred: +1xxxxxxxxxx
-  return requiredEnv('SIGNALWIRE_PHONE_NUMBER');
+  const raw = must('SIGNALWIRE_PHONE_NUMBER', process.env.SIGNALWIRE_PHONE_NUMBER);
+  const from = normalizeE164(raw);
+  if (!from.startsWith('+')) throw new Error('SIGNALWIRE_PHONE_NUMBER must be E.164 like +19125567581');
+  return from;
 }
 
 export function buildOutboundLaML(toNumber: string, statusCallbackUrl: string): string {
-  const fromNumber = getFromNumber();
+  // Keep it dead simple: Dial the number, send status events back
+  const to = (toNumber ?? '').toString().trim();
+  const status = (statusCallbackUrl ?? '').toString().trim();
 
-  // SignalWire "Compatibility API" accepts TwiML.
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial callerId="${fromNumber}" timeout="30" action="${statusCallbackUrl}" method="POST">
-    <Number
-      statusCallback="${statusCallbackUrl}"
-      statusCallbackMethod="POST"
-      statusCallbackEvent="initiated ringing answered completed"
-    >${toNumber}</Number>
+  <Dial callerId="${getFromNumber()}" timeout="30" action="${status}" method="POST">
+    <Number statusCallback="${status}" statusCallbackMethod="POST" statusCallbackEvent="initiated ringing answered completed">${to}</Number>
   </Dial>
 </Response>`;
 }
