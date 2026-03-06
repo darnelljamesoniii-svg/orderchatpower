@@ -1,3 +1,4 @@
+import 'server-only';
 import { RestClient } from '@signalwire/compatibility-api';
 import 'server-only';
 
