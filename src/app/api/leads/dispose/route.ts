@@ -6,7 +6,7 @@ export const runtime = 'nodejs';
 const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
 import { createSquarePaymentLink } from '@/lib/square';
-import { sendPaymentSms } from '@/lib/signalwire-server';
+import { sendPaymentSms } from '@/lib/signalwire-sms';
 import { FieldValue } from 'firebase-admin/firestore';
 import type { DispositionPayload } from '@/types';
 export const dynamic = 'force-dynamic';
