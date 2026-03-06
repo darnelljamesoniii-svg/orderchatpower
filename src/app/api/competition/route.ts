@@ -3,65 +3,87 @@ import { NextRequest, NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/**
- * Helper to resolve Google Feature IDs (/g/...) to standard Place IDs (ChIJ...)
- * Google Details API can fail if you pass it a /g/ ID directly.
- */
-async function resolvePlaceId(id: string, apiKey: string): Promise<string> {
-  if (!id) throw new Error('Missing id');
-  if (!id.startsWith('/g/')) return id;
-
-  const fallbackUrl =
-    `https://maps.googleapis.com/maps/api/place/findplacefromtext/json` +
-    `?input=${encodeURIComponent(id)}` +
-    `&inputtype=textquery&fields=place_id,name,geometry&key=${apiKey}`;
-
-  const response = await fetch(fallbackUrl);
-  if (!response.ok) throw new Error(`Google API responded with status: ${response.status}`);
-
-  const data = await response.json();
-  if (data?.candidates?.length) return data.candidates[0].place_id;
-
-  throw new Error(`No Place ID mapping found for Feature ID: ${id}`);
+function getApiKey() {
+  return (
+    process.env.GOOGLE_MAPS_API_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ||
+    ''
+  );
 }
 
-async function handleCompetition(payload: { placeId?: string; place_id?: string }) {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY?.trim();
+/**
+ * If placeId is already a ChIJ... Place ID, return it.
+ * If it's a /g/... feature id, resolve using name+address (NOT the /g/... string).
+ */
+async function resolvePlaceId(args: {
+  placeId: string;
+  name?: string;
+  address?: string;
+  apiKey: string;
+}): Promise<string> {
+  const { placeId, name, address, apiKey } = args;
+
+  if (!placeId) throw new Error('Missing placeId');
+  if (!placeId.startsWith('/g/')) return placeId;
+
+  const query = [name, address].filter(Boolean).join(' ').trim();
+  if (!query) {
+    throw new Error('Cannot resolve /g/ id without name/address');
+  }
+
+  const url =
+    `https://maps.googleapis.com/maps/api/place/findplacefromtext/json` +
+    `?input=${encodeURIComponent(query)}` +
+    `&inputtype=textquery` +
+    `&fields=place_id,name` +
+    `&key=${encodeURIComponent(apiKey)}`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (data?.status !== 'OK' || !data?.candidates?.length) {
+    throw new Error(`findplacefromtext failed: ${data?.status ?? 'UNKNOWN'}`);
+  }
+
+  return data.candidates[0].place_id;
+}
+
+async function handle(reqData: { placeId?: string; place_id?: string; name?: string; address?: string }) {
+  const apiKey = getApiKey();
   if (!apiKey) {
-    return NextResponse.json(
-      { ok: false, error: 'Server configuration error: Missing GOOGLE_MAPS_API_KEY' },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: 'Missing GOOGLE_MAPS_API_KEY' }, { status: 500 });
   }
 
-  const placeId = (payload.placeId ?? payload.place_id ?? '').toString().trim();
+  const placeId = (reqData.placeId ?? reqData.place_id ?? '').toString().trim();
+  const name = (reqData.name ?? '').toString().trim();
+  const address = (reqData.address ?? '').toString().trim();
+
   if (!placeId) {
-    return NextResponse.json({ ok: false, error: 'Missing placeId' }, { status: 400 });
+    return NextResponse.json({ ok: false, error: 'Missing place_id' }, { status: 400 });
   }
 
-  // 1) Resolve /g/ ids → ChIJ...
   let finalPlaceId: string;
   try {
-    finalPlaceId = await resolvePlaceId(placeId, apiKey);
+    finalPlaceId = await resolvePlaceId({ placeId, name, address, apiKey });
   } catch (e: any) {
     return NextResponse.json(
-      { ok: false, error: 'Could not resolve location format.', details: e?.message ?? String(e) },
+      { ok: false, error: 'Could not resolve place_id', details: e?.message ?? String(e) },
       { status: 400 }
     );
   }
 
-  // 2) Place details
   const detailsUrl =
     `https://maps.googleapis.com/maps/api/place/details/json` +
     `?place_id=${encodeURIComponent(finalPlaceId)}` +
-    `&key=${apiKey}`;
+    `&fields=place_id,name,types,formatted_address,geometry,website,rating,user_ratings_total` +
+    `&key=${encodeURIComponent(apiKey)}`;
 
   const detailsRes = await fetch(detailsUrl);
   const detailsData = await detailsRes.json();
 
   if (detailsData?.status !== 'OK') {
     return NextResponse.json(
-      { ok: false, error: `Google Details API error: ${detailsData?.status ?? 'UNKNOWN'}` },
+      { ok: false, error: `Place Details failed: ${detailsData?.status ?? 'UNKNOWN'}` },
       { status: 400 }
     );
   }
@@ -70,44 +92,22 @@ async function handleCompetition(payload: { placeId?: string; place_id?: string 
     ok: true,
     placeId: finalPlaceId,
     name: detailsData?.result?.name ?? null,
-    message: 'Competition location verified successfully',
+    address: detailsData?.result?.formatted_address ?? null,
+    result: detailsData?.result ?? null,
   });
 }
 
-/**
- * GET wrapper so /api/competition?place_id=... works (fixes 405)
- */
 export async function GET(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const place_id = searchParams.get('place_id') ?? '';
-    const placeId = searchParams.get('placeId') ?? '';
-    // (name/address are optional; keep them if you later use them)
-    return await handleCompetition({ placeId, place_id });
-  } catch (err: any) {
-    console.error('CRITICAL_API_ERROR (GET /api/competition):', err);
-    return NextResponse.json(
-      { ok: false, error: 'Internal Server Error', message: err?.message ?? String(err) },
-      { status: 500 }
-    );
-  }
+  const { searchParams } = new URL(req.url);
+  return handle({
+    place_id: searchParams.get('place_id') ?? undefined,
+    placeId: searchParams.get('placeId') ?? undefined,
+    name: searchParams.get('name') ?? undefined,
+    address: searchParams.get('address') ?? undefined,
+  });
 }
 
-export async function POST(req) {
-  try {
-
-    const apiKey =
-      process.env.GOOGLE_MAPS_API_KEY ||
-      process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
-    // ADD THESE TWO LINES RIGHT HERE
-    console.log('GOOGLE_MAPS_API_KEY exists?', !!process.env.GOOGLE_MAPS_API_KEY);
-    console.log('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY exists?', !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
-
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: 'Server configuration error: Missing API Key' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
+export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => ({}));
+  return handle(body);
 }
