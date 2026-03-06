@@ -1,4 +1,5 @@
 import { RestClient } from '@signalwire/compatibility-api';
+import 'server-only';
 
 function must(name: string, val?: string) {
   const v = (val ?? '').trim();
