@@ -10,7 +10,7 @@
 /sales       → Agent Battle Station  (softphone + AI coach + concierge preview)
 /supervisor  → Supervisor Dashboard  (PIN-protected — campaigns, imports, monitoring)
 /concierge   → Consumer Chatbot      (prospect-facing restaurant finder)
-/unlock      → Prospect LP           (zone pricing, competitor analysis, Square checkout)
+/unlock      → Prospect LP           (zone pricing, competitor analysis, Square checkout
 ```
 
 ---
