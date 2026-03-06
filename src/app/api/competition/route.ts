@@ -93,15 +93,21 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req) {
   try {
-    const body = await req.json().catch(() => ({}));
-    return await handleCompetition(body);
-  } catch (err: any) {
-    console.error('CRITICAL_API_ERROR (POST /api/competition):', err);
-    return NextResponse.json(
-      { ok: false, error: 'Internal Server Error', message: err?.message ?? String(err) },
-      { status: 500 }
-    );
-  }
+
+    const apiKey =
+      process.env.GOOGLE_MAPS_API_KEY ||
+      process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+    // ADD THESE TWO LINES RIGHT HERE
+    console.log('GOOGLE_MAPS_API_KEY exists?', !!process.env.GOOGLE_MAPS_API_KEY);
+    console.log('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY exists?', !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
+
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error: Missing API Key' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 }
