@@ -1,105 +1,130 @@
 import { getAdminDb } from '@/lib/firebase-admin';
-const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
 import type { Lead } from '@/types';
 
+const adminDb = getAdminDb();
+
 export interface CsvRow {
-  businessName:   string;
-  contactName:    string;
-  phone:          string;
-  phone2?:        string;
-  email?:         string;
-  kgmid:          string;
-  timezone:       string;
-  utcOffsetHours: number;
-  campaign?:      string;  // optional — assigned by supervisor at import time
-  address?:       string;
+  businessName: string;
+  Full_Address: string;
+  City: string;
+  Website?: string;
+  Email_From_WEBSITE?: string;
+  Phone_1?: string;
+  Zip?: string;
+  Place_ID: string;
+  contactName?: string;
+  campaign?: string;
 }
 
 export interface ImportResult {
-  imported:   number;
+  imported: number;
   duplicates: number;
-  errors:     string[];
+  errors: string[];
 }
 
 /**
- * Normalises a phone number to E.164 format (digits only, with country code).
+ * Normalizes a phone number to E.164 when possible.
+ * Returns undefined if blank.
  */
-function normalisePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
-  return digits.length === 10 ? `+1${digits}` : `+${digits}`;
+function normalisePhone(phone?: string): string | undefined {
+  if (!phone) return undefined;
+  const digits = String(phone).replace(/\D/g, '');
+  if (!digits) return undefined;
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  return `+${digits}`;
 }
 
 /**
- * Import CSV rows into Firestore, deduplicating on phone AND kgmid.
- * Uses batched writes (max 500/batch).
+ * Imports rows into Firestore using Place_ID as the source of truth.
+ * Dedupe priority:
+ *   1) Place_ID
+ *   2) normalized phone (if present)
  */
 export async function importLeads(rows: CsvRow[]): Promise<ImportResult> {
   const leadsRef = adminDb.collection(COLLECTIONS.LEADS);
   const result: ImportResult = { imported: 0, duplicates: 0, errors: [] };
 
-  // Pre-fetch all existing phones and kgmids in one go
-  const existingPhonesSnap = await leadsRef.select('phone', 'kgmid').get();
-  const existingPhones  = new Set<string>();
-  const existingKgmids  = new Set<string>();
+  const existingSnap = await leadsRef.select('place_id', 'phone').get();
+  const existingPlaceIds = new Set<string>();
+  const existingPhones = new Set<string>();
 
-  existingPhonesSnap.docs.forEach(d => {
+  existingSnap.docs.forEach((d) => {
     const data = d.data();
-    if (data.phone)  existingPhones.add(normalisePhone(data.phone));
-    if (data.kgmid)  existingKgmids.add(data.kgmid);
+    if (data.place_id) existingPlaceIds.add(String(data.place_id).trim());
+    if (data.phone) existingPhones.add(String(data.phone).trim());
   });
 
   const BATCH_SIZE = 450;
-  let batch        = adminDb.batch();
-  let batchCount   = 0;
+  let batch = adminDb.batch();
+  let batchCount = 0;
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    try {
-      const normPhone = normalisePhone(row.phone);
 
-      if (existingPhones.has(normPhone) || existingKgmids.has(row.kgmid)) {
+    try {
+      const placeId = String(row.Place_ID || '').trim();
+      if (!placeId) {
+        result.errors.push(`Row ${i + 1}: Missing Place_ID`);
+        continue;
+      }
+
+      const normPhone = normalisePhone(row.Phone_1);
+
+      if (existingPlaceIds.has(placeId) || (normPhone && existingPhones.has(normPhone))) {
         result.duplicates++;
         continue;
       }
 
-      const now   = new Date().toISOString();
-      const docId = leadsRef.doc().id;
-      const lead: Omit<Lead, 'id'> = {
-        businessName:   row.businessName,
-        contactName:    row.contactName,
-        phone:          normPhone,
-        phone2:         row.phone2 || undefined,
-        email:          row.email  || undefined,
-        kgmid:          row.kgmid,
-        address:        row.address || undefined,
-        timezone:       row.timezone,
-        utcOffsetHours: Number(row.utcOffsetHours),
-        status:         'NEW',
-        retryCount:     0,
-        campaign:       row.campaign ?? 'general',
-        createdAt:      now,
-        updatedAt:      now,
+      const now = new Date().toISOString();
+
+      const lead: Omit<Lead, 'id'> & {
+        place_id: string;
+        city?: string;
+        zip?: string;
+        website?: string;
+      } = {
+        businessName: String(row.businessName || '').trim(),
+        contactName: String(row.contactName || '').trim() || undefined,
+        phone: normPhone,
+        email: String(row.Email_From_WEBSITE || '').trim() || undefined,
+        address: String(row.Full_Address || '').trim() || undefined,
+        city: String(row.City || '').trim() || undefined,
+        zip: String(row.Zip || '').trim() || undefined,
+        website: String(row.Website || '').trim() || undefined,
+        place_id: placeId,
+        status: 'NEW',
+        retryCount: 0,
+        campaign: row.campaign ?? 'general',
+        createdAt: now,
+        updatedAt: now,
       };
 
-      batch.set(leadsRef.doc(docId), lead);
-      existingPhones.add(normPhone);
-      existingKgmids.add(row.kgmid);
+      // Use Place_ID as the Firestore document ID for easy lookup/testing
+      batch.set(leadsRef.doc(placeId), lead, { merge: true });
+
+      existingPlaceIds.add(placeId);
+      if (normPhone) existingPhones.add(normPhone);
+
       batchCount++;
       result.imported++;
 
       if (batchCount >= BATCH_SIZE) {
         await batch.commit();
-        batch      = adminDb.batch();
+        batch = adminDb.batch();
         batchCount = 0;
       }
     } catch (err: unknown) {
-      result.errors.push(`Row ${i + 1}: ${err instanceof Error ? err.message : String(err)}`);
+      result.errors.push(
+        `Row ${i + 1}: ${err instanceof Error ? err.message : String(err)}`
+      );
     }
   }
 
-  if (batchCount > 0) await batch.commit();
+  if (batchCount > 0) {
+    await batch.commit();
+  }
 
   return result;
 }
-
