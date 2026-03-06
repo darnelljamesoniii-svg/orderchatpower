@@ -1,17 +1,14 @@
 'use client';
 
-// ─── useSignalWireDevice (Server-Call Mode) ───────────────────────────────────
-// Remote-team friendly: no browser Voice SDK, no mic permissions, no tokens.
-// UI triggers server-side call initiation, backend/webhooks handle call lifecycle.
-
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { Device } from '@signalwire/compatibility-api';
 
 export type CallState = 'idle' | 'connecting' | 'ringing' | 'in-call' | 'disconnecting' | 'error';
 
 interface UseSignalWireDeviceOptions {
   agentId: string;
-  onCallConnected?: (meta?: { callSid?: string | null }) => void;
-  onCallDisconnected?: (meta?: { callSid?: string | null }) => void;
+  onCallConnected?: (call: any) => void;
+  onCallDisconnected?: () => void;
   onError?: (error: Error) => void;
 }
 
@@ -21,98 +18,124 @@ export function useSignalWireDevice({
   onCallDisconnected,
   onError,
 }: UseSignalWireDeviceOptions) {
+
   const [state, setState] = useState<CallState>('idle');
-  const [error, setError] = useState<string | null>(null);
   const [callSid, setCallSid] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
 
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const deviceRef = useRef<any>(null);
+  const callRef = useRef<any>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const timerRef = useRef<any>(null);
 
-  const startTimer = useCallback(() => {
+  const startTimer = () => {
     if (timerRef.current) return;
-    timerRef.current = setInterval(() => setDuration((d) => d + 1), 1000);
-  }, []);
+    timerRef.current = setInterval(() => {
+      setDuration((d) => d + 1);
+    }, 1000);
+  };
 
-  const stopTimer = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+  const stopTimer = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = null;
     setDuration(0);
-  }, []);
+  };
 
-  // Optional: if you later wire a realtime listener / polling endpoint to detect
-  // answered/completed, you can transition states more accurately.
   const init = useCallback(async () => {
-    // no-op in server-call mode
-    setError(null);
-    setState('idle');
-  }, []);
+
+    try {
+      const res = await fetch('/api/signalwire/token');
+      const data = await res.json();
+
+      const device = new Device(data.token, {
+        codecPreferences: ['opus','pcmu'],
+        fakeLocalDTMF: true,
+        enableRingingState: true
+      });
+
+      deviceRef.current = device;
+
+      device.on('ready', () => {
+        console.log('SignalWire device ready');
+      });
+
+      device.on('error', (err:any) => {
+        setState('error');
+        onError?.(err);
+      });
+
+      device.on('connect', (call:any) => {
+
+        callRef.current = call;
+        setCallSid(call.parameters?.CallSid ?? null);
+        setState('in-call');
+
+        const audio = new Audio();
+        audio.autoplay = true;
+        audio.srcObject = call.getRemoteStream();
+        audioRef.current = audio;
+
+        startTimer();
+        onCallConnected?.(call);
+      });
+
+      device.on('disconnect', () => {
+        setState('idle');
+        stopTimer();
+        onCallDisconnected?.();
+      });
+
+      device.register();
+
+    } catch (err:any) {
+      setState('error');
+      onError?.(err);
+    }
+
+  }, [onCallConnected, onCallDisconnected, onError]);
 
   useEffect(() => {
     if (agentId) init();
-    return () => {
-      stopTimer();
-    };
-  }, [agentId, init, stopTimer]);
+    return () => stopTimer();
+  }, [agentId, init]);
 
-  const makeCall = useCallback(
-    async (leadID: string) => {
-      if (!agentId) {
-        const e = new Error('Missing agentId');
-        setError(e.message);
-        setState('error');
-        onError?.(e);
-        return;
-      }
+  const makeCall = useCallback(async (leadId: string) => {
 
-      setError(null);
-      setState('connecting');
+    if (!deviceRef.current) return;
 
-      try {
-        const res = await fetch('/api/calls/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ agentId, leadId: leadID }),
-        });
+    setState('connecting');
 
-        const data = await res.json().catch(() => ({} as any));
-        if (!res.ok) throw new Error(data?.error || 'Failed to start call');
+    const call = deviceRef.current.connect({
+      params: { leadId }
+    });
 
-        setCallSid(data?.callSid ?? null);
+    callRef.current = call;
 
-        // In server-side calling, "ringing/answered/completed" are best driven by webhooks.
-        // We'll optimistically show ringing now.
-        setState('ringing');
+    call.on('ringing', () => setState('ringing'));
 
-        // If you want to start timer only when actually answered, start it from a webhook-driven UI update instead.
-        // For now, start it here so reps see time ticking.
-        startTimer();
-
-        onCallConnected?.({ callSid: data?.callSid ?? null });
-      } catch (err: unknown) {
-        const e = err instanceof Error ? err : new Error('Call failed');
-        setError(e.message);
-        setState('error');
-        stopTimer();
-        onError?.(e);
-      }
-    },
-    [agentId, onCallConnected, onError, startTimer, stopTimer],
-  );
-
-  const hangUp = useCallback(async () => {
-    // If you have an API endpoint to end calls, call it here.
-    // For now, just reset local UI state.
-    setState('idle');
-    setCallSid(null);
-    stopTimer();
-    onCallDisconnected?.({ callSid });
-  }, [callSid, onCallDisconnected, stopTimer]);
-
-  const mute = useCallback((_muted: boolean) => {
-    // No-op in server-call mode (muting requires browser audio or a provider feature).
   }, []);
 
-  return { state, error, callSid, duration, makeCall, hangUp, mute, reinit: init };
+  const hangUp = useCallback(() => {
+
+    if (callRef.current) {
+      callRef.current.disconnect();
+      callRef.current = null;
+    }
+
+  }, []);
+
+  const mute = useCallback((muted:boolean) => {
+    if (!callRef.current) return;
+    callRef.current.mute(muted);
+  }, []);
+
+  return {
+    state,
+    callSid,
+    duration,
+    makeCall,
+    hangUp,
+    mute,
+    reinit: init
+  };
 }
