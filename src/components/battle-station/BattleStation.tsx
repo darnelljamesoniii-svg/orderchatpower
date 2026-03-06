@@ -117,7 +117,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
         setCurrentLead(lead);
         clearTranscript();
         setBattleCard(null);
-        makeCall(lead.id);
+        makeCall(lead.phone);
       } else {
         setMode('IDLE');
         toast.error('Queue Empty');
