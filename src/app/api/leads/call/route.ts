@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS } from '@/lib/collections';
-import { getSwClient, buildOutboundLaML } from '@/lib/signalwire-server';
+import {
+  getSwClient,
+  buildOutboundLaML,
+  getFromNumber,
+  normalizeE164,
+  getPublicBaseUrlOrThrow,
+  getSignalWireAuthToken,
+} from '@/lib/signalwire-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,16 +27,15 @@ export async function POST(req: Request) {
     if (!leadSnap.exists) return NextResponse.json({ ok: false, error: 'Lead not found' }, { status: 404 });
 
     const lead = leadSnap.data() as any;
-    const toNumber = (lead?.phone ?? '').toString().trim();
-    if (!toNumber) return NextResponse.json({ ok: false, error: 'Lead missing phone' }, { status: 400 });
+    const toNumber = normalizeE164((lead?.phone ?? '').toString().trim());
+    if (!toNumber || !toNumber.startsWith('+')) {
+      return NextResponse.json({ ok: false, error: 'Lead missing/invalid phone' }, { status: 400 });
+    }
 
-    const baseUrl = process.env.PUBLIC_BASE_URL?.trim();
-    if (!baseUrl) return NextResponse.json({ ok: false, error: 'Missing PUBLIC_BASE_URL' }, { status: 500 });
-
-    const fromNumber = process.env.SIGNALWIRE_PHONE_NUMBER?.trim();
-    if (!fromNumber) return NextResponse.json({ ok: false, error: 'Missing SIGNALWIRE_PHONE_NUMBER' }, { status: 500 });
-
-    const statusUrl = `${baseUrl}/api/calls/status`;
+    const baseUrl = getPublicBaseUrlOrThrow();
+    getSignalWireAuthToken();
+    const fromNumber = getFromNumber();
+    const statusUrl = `${baseUrl}/api/signalwire/status`;
 
     const call = await getSwClient().calls.create({
       to: toNumber,

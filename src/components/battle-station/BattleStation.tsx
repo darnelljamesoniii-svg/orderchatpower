@@ -8,6 +8,7 @@ import ProspectActivityPanel from '@/components/battle-station/ProspectActivityP
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { formatDuration } from '@/lib/utils';
+import { buildDemoLink } from '@/lib/resend';
 import type { Lead, BattleCard } from '@/types';
 import {
   Mic, Zap, ChevronRight,
@@ -16,7 +17,7 @@ import {
 import toast from 'react-hot-toast';
 
 interface BattleStationProps {
-  agentId:   string;
+  agentId: string;
   agentName: string;
 }
 
@@ -26,67 +27,112 @@ function Waveform() {
   return (
     <div className="flex items-center gap-[3px] h-6">
       {Array.from({ length: 12 }).map((_, i) => (
-        <div key={i} className="w-[3px] bg-neon rounded-sm animate-waveBar" style={{ animationDelay: `${i * 0.08}s`, height: '100%' }} />
+        <div
+          key={i}
+          className="w-[3px] bg-neon rounded-sm animate-waveBar"
+          style={{ animationDelay: `${i * 0.08}s`, height: '100%' }}
+        />
       ))}
     </div>
   );
 }
 
 export default function BattleStation({ agentId, agentName }: BattleStationProps) {
-  const [mode,         setMode]         = useState<DialerMode>('IDLE');
-  const [currentLead,  setCurrentLead]  = useState<Lead | null>(null);
-  const [callLogId,    setCallLogId]    = useState('');
-  const [battleCard,   setBattleCard]   = useState<BattleCard | null>(null);
-  const [cardLoading,  setCardLoading]  = useState(false);
+  const [mode, setMode] = useState<DialerMode>('IDLE');
+  const [currentLead, setCurrentLead] = useState<Lead | null>(null);
+  const [callLogId, setCallLogId] = useState('');
+  const [battleCard, setBattleCard] = useState<BattleCard | null>(null);
+  const [cardLoading, setCardLoading] = useState(false);
   const [fetchingLead, setFetchingLead] = useState(false);
-  const [deviceReady,  setDeviceReady]  = useState(false);
+  const [deviceReady, setDeviceReady] = useState(false);
 
-  const heartbeatRef     = useRef<ReturnType<typeof setInterval> | null>(null);
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const objectionCooldown = useRef(false);
-  const modeRef          = useRef(mode);
+  const modeRef = useRef(mode);
   useEffect(() => { modeRef.current = mode; }, [mode]);
 
-  // ── Session Sync & Heartbeat ──
   useEffect(() => {
     fetch('/api/agents/sync', {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ agentId, agentName }),
+      body: JSON.stringify({ agentId, agentName }),
     }).then(() => setDeviceReady(true)).catch(() => toast.error('Sync Error'));
 
     heartbeatRef.current = setInterval(() => {
       fetch('/api/agents/heartbeat', {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ agentId, status: modeRef.current }),
+        body: JSON.stringify({ agentId, status: modeRef.current }),
       }).catch(() => {});
     }, 30000);
 
-    return () => { if (heartbeatRef.current) clearInterval(heartbeatRef.current); };
+    return () => {
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+    };
   }, [agentId, agentName]);
 
-  // ── Objection / Battle Card ──
   const onObjectionDetected = useCallback(async (text: string) => {
     if (objectionCooldown.current || !currentLead) return;
+
     objectionCooldown.current = true;
     setTimeout(() => { objectionCooldown.current = false; }, 15000);
     setCardLoading(true);
+
     try {
       const res = await fetch('/api/gemini/battlecard', {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ transcript: text, businessType: currentLead.businessName }),
+        body: JSON.stringify({ transcript: text, businessType: currentLead.businessName }),
       });
       setBattleCard(await res.json());
-    } finally { setCardLoading(false); }
+    } finally {
+      setCardLoading(false);
+    }
   }, [currentLead]);
 
-  const { isListening, transcript, start: startTranscript, stop: stopTranscript, clear: clearTranscript } =
-    useSpeechTranscription({ onObjection: onObjectionDetected, onTranscript: () => {} });
+  const {
+    transcript,
+    start: startTranscript,
+    stop: stopTranscript,
+    clear: clearTranscript,
+  } = useSpeechTranscription({ onObjection: onObjectionDetected, onTranscript: () => {} });
 
-  const { state: callState, duration, makeCall, hangUp, mute } = useSignalWireDevice({
+  const fetchNextLead = useCallback(async () => {
+    setFetchingLead(true);
+
+    try {
+      const res = await fetch('/api/leads/next', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId }),
+      });
+
+      const data = await res.json();
+
+      if (data.lead) {
+        const lead: Lead = {
+          ...data.lead,
+          sessionId: data.lead.sessionId || `session_${data.lead.id}_${Date.now()}`,
+        };
+
+        setCurrentLead(lead);
+        clearTranscript();
+        setBattleCard(null);
+        setCallLogId('');
+        makeCall(lead.phone, lead.id);
+      } else {
+        setMode('IDLE');
+        toast.error('Queue Empty');
+      }
+    } finally {
+      setFetchingLead(false);
+    }
+  }, [agentId, clearTranscript]);
+
+  const { state: callState, duration, makeCall, hangUp } = useSignalWireDevice({
     agentId,
-    onCallConnected: () => {
+    onCallConnected: (payload: any) => {
+      if (payload?.callLogId) setCallLogId(payload.callLogId);
       startTranscript();
       toast.success('CONNECTED');
     },
@@ -97,66 +143,62 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
         setTimeout(fetchNextLead, 3000);
       }
     },
+    onError: (err: Error) => toast.error('SignalWire: ' + err.message),
   });
 
-  const fetchNextLead = useCallback(async () => {
-    setFetchingLead(true);
-    try {
-      const res  = await fetch('/api/leads/next', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ agentId }),
-      });
-      const data = await res.json();
-      if (data.lead) {
-        // Ensure sessionId exists so the demo link works
-        const lead: Lead = {
-          ...data.lead,
-          sessionId: data.lead.sessionId || `session_${data.lead.id}_${Date.now()}`,
-        };
-        setCurrentLead(lead);
-        clearTranscript();
-        setBattleCard(null);
-        makeCall(lead.phone);
-      } else {
-        setMode('IDLE');
-        toast.error('Queue Empty');
-      }
-    } finally { setFetchingLead(false); }
-  }, [agentId, makeCall, clearTranscript]);
+  const startSession = () => {
+    setMode('ACTIVE');
+    fetchNextLead();
+  };
 
-  const startSession = () => { setMode('ACTIVE'); fetchNextLead(); };
   const pauseSession = () => setMode('PAUSED');
-  const stopSession  = () => { setMode('IDLE'); setCurrentLead(null); hangUp(); };
+
+  const stopSession = () => {
+    setMode('IDLE');
+    setCurrentLead(null);
+    hangUp();
+  };
 
   const isOnCall = callState === 'in-call' || callState === 'ringing';
 
+  const demoHref = currentLead
+    ? buildDemoLink({
+        placeId: currentLead.placeId,
+        kgmid: currentLead.kgmid,
+        sessionId: currentLead.sessionId ?? '',
+        businessName: currentLead.businessName ?? '',
+        address: currentLead.address ?? '',
+        absolute: false,
+      })
+    : '';
+
   return (
     <div className="h-full flex gap-4 p-4 bg-bg overflow-hidden text-white">
-
-      {/* LEFT: Prospect Mirror + Controls */}
       <div className="w-[450px] flex flex-col gap-4 flex-shrink-0">
-        <Card header={
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-2">
-              <Wifi size={12} className="text-accent" /> Prospect Mirror (Unlock)
+        <Card
+          header={
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-2">
+                <Wifi size={12} className="text-accent" /> Prospect Mirror (Unlock)
+              </div>
+              {currentLead && demoHref && (
+                <a
+                  href={demoHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-white/40 hover:text-white"
+                >
+                  <ExternalLink size={12} />
+                </a>
+              )}
             </div>
-{currentLead && (
-  <a
-    href={`/unlock?place_id=${encodeURIComponent(currentLead.kgmid ?? '')}&name=${encodeURIComponent(currentLead.businessName ?? '')}&address=${encodeURIComponent(currentLead.address ?? '')}&sessionId=${encodeURIComponent(currentLead.sessionId ?? '')}`}
-    target="_blank"
-    rel="noreferrer"
-    className="text-white/40 hover:text-white"
-  >
-    <ExternalLink size={12} />
-  </a>
-)}
-          </div>
-        } noPadding>
+          }
+          noPadding
+        >
           <div className="relative bg-black aspect-[4/3] border-b border-white/5 overflow-hidden">
-            {currentLead ? (
+            {currentLead && demoHref ? (
               <iframe
-                src={`/unlock?place_id=${encodeURIComponent(currentLead.kgmid ?? '')}&name=${encodeURIComponent(currentLead.businessName ?? '')}&address=${encodeURIComponent(currentLead.address ?? '')}&sessionId=${encodeURIComponent(currentLead.sessionId ?? '')}&agent_preview=true`}
+                src={`${demoHref}&agent_preview=true`}
                 className="w-full h-full border-0 pointer-events-none"
                 title="Prospect Mirror"
               />
@@ -165,25 +207,42 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
                 {mode === 'ACTIVE' ? 'Dialing Next...' : 'Dialer Standby'}
               </div>
             )}
+
             {isOnCall && (
               <div className="absolute top-4 right-4 bg-black/80 px-4 py-2 rounded-xl border border-neon/30 flex items-center gap-3">
                 <Waveform />
-                <span className="font-mono text-xl text-neon font-bold">{formatDuration(duration)}</span>
+                <span className="font-mono text-xl text-neon font-bold">
+                  {formatDuration(duration)}
+                </span>
               </div>
             )}
           </div>
 
           <div className="p-4 grid grid-cols-2 gap-2 bg-white/5">
             {mode === 'IDLE' ? (
-              <Button variant="success" className="col-span-2 py-6 text-lg" onClick={startSession} disabled={!deviceReady}>
+              <Button
+                variant="success"
+                className="col-span-2 py-6 text-lg"
+                onClick={startSession}
+                disabled={!deviceReady}
+              >
                 <Play size={20} className="mr-2" /> Start New Session
               </Button>
             ) : (
               <>
-                <Button variant={mode === 'ACTIVE' ? 'ghost' : 'success'} onClick={mode === 'ACTIVE' ? pauseSession : startSession}>
-                  {mode === 'ACTIVE'
-                    ? <><Pause size={14} className="mr-2" /> Pause Session</>
-                    : <><Play  size={14} className="mr-2" /> Resume Session</>}
+                <Button
+                  variant={mode === 'ACTIVE' ? 'ghost' : 'success'}
+                  onClick={mode === 'ACTIVE' ? pauseSession : startSession}
+                >
+                  {mode === 'ACTIVE' ? (
+                    <>
+                      <Pause size={14} className="mr-2" /> Pause Session
+                    </>
+                  ) : (
+                    <>
+                      <Play size={14} className="mr-2" /> Resume Session
+                    </>
+                  )}
                 </Button>
                 <Button variant="danger" onClick={stopSession}>
                   <Square size={14} className="mr-2" /> Stop Dialer
@@ -193,40 +252,61 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
           </div>
         </Card>
 
-        {/* TRANSCRIPT */}
-        <Card header={<div className="flex items-center gap-2"><Mic size={12} /> Live Audio Transcript</div>} className="flex-1 overflow-hidden">
+        <Card
+          header={
+            <div className="flex items-center gap-2">
+              <Mic size={12} /> Live Audio Transcript
+            </div>
+          }
+          className="flex-1 overflow-hidden"
+        >
           <div className="space-y-4 overflow-y-auto h-full p-4 text-[13px] leading-relaxed">
             {transcript.map((t, i) => (
-              <div key={i} className={t.speaker === 'Agent' ? 'text-accent border-l-2 border-accent/20 pl-3' : 'text-white border-l-2 border-white/10 pl-3'}>
-                <span className="font-bold uppercase text-[9px] opacity-40 mb-1 block">{t.speaker}</span>
+              <div
+                key={i}
+                className={
+                  t.speaker === 'Agent'
+                    ? 'text-accent border-l-2 border-accent/20 pl-3'
+                    : 'text-white border-l-2 border-white/10 pl-3'
+                }
+              >
+                <span className="font-bold uppercase text-[9px] opacity-40 mb-1 block">
+                  {t.speaker}
+                </span>
                 {t.text}
               </div>
             ))}
-            {transcript.length === 0 && <p className="text-white/10 italic">No audio detected yet...</p>}
+            {transcript.length === 0 && (
+              <p className="text-white/10 italic">No audio detected yet...</p>
+            )}
           </div>
         </Card>
       </div>
 
-      {/* MIDDLE: Battle Card + Disposition */}
       <div className="w-80 flex flex-col gap-4 flex-shrink-0">
         <Card header={<><Zap size={12} className="text-neon" /> AI Battle Card</>}>
-          {cardLoading
-            ? <div className="flex items-center gap-2 text-accent text-xs animate-pulse"><Loader2 size={14} className="animate-spin" /> Thinking...</div>
-            : battleCard
-              ? (
-                <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2">
-                  <div className="bg-neon/10 border border-neon/30 rounded-lg p-3">
-                    <div className="text-[10px] tracking-widest uppercase text-neon font-bold mb-1">⚡ Rebuttal</div>
-                    <p className="text-white text-[13px]">{battleCard.rebuttal}</p>
-                  </div>
-                  <div className="bg-accent/10 border border-accent/30 rounded-lg p-3">
-                    <div className="text-[10px] tracking-widest uppercase text-accent font-bold mb-1">🎯 Follow Up</div>
-                    <p className="text-white text-[13px]">{battleCard.followUp}</p>
-                  </div>
+          {cardLoading ? (
+            <div className="flex items-center gap-2 text-accent text-xs animate-pulse">
+              <Loader2 size={14} className="animate-spin" /> Thinking...
+            </div>
+          ) : battleCard ? (
+            <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2">
+              <div className="bg-neon/10 border border-neon/30 rounded-lg p-3">
+                <div className="text-[10px] tracking-widest uppercase text-neon font-bold mb-1">
+                  ⚡ Rebuttal
                 </div>
-              )
-              : <p className="text-white/20 text-xs italic">Coaching tips will appear here.</p>
-          }
+                <p className="text-white text-[13px]">{battleCard.rebuttal}</p>
+              </div>
+              <div className="bg-accent/10 border border-accent/30 rounded-lg p-3">
+                <div className="text-[10px] tracking-widest uppercase text-accent font-bold mb-1">
+                  🎯 Follow Up
+                </div>
+                <p className="text-white text-[13px]">{battleCard.followUp}</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-white/20 text-xs italic">Coaching tips will appear here.</p>
+          )}
         </Card>
 
         <Card header={<><ChevronRight size={12} /> Disposition</>} className="flex-1">
@@ -234,7 +314,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
             lead={currentLead}
             agentId={agentId}
             callLogId={callLogId}
-            onDisposed={(action, squareUrl) => {
+            onDisposed={() => {
               if (modeRef.current === 'ACTIVE') {
                 toast('Next lead in 3s...', { icon: '⏳' });
                 setTimeout(fetchNextLead, 3000);
@@ -245,7 +325,6 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
         </Card>
       </div>
 
-      {/* RIGHT: Prospect Info + Activity */}
       <div className="flex-1 min-w-0">
         <ProspectActivityPanel
           lead={currentLead}
@@ -258,3 +337,6 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
     </div>
   );
 }
+
+
+

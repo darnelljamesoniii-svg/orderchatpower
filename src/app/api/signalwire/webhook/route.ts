@@ -1,36 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildOutboundLaML } from '@/lib/signalwire-server';
+import { buildOutboundLaML, getOptionalSignalWireAuthToken } from '@/lib/signalwire-server';
 import { validateSignalWireSignature } from '@/lib/signalwire-signature';
 
 export const dynamic = 'force-dynamic';
 
-const appUrl     = process.env.NEXT_PUBLIC_APP_URL!;
-const apiToken   = process.env.SIGNALWIRE_REST_API_TOKEN!;
+function inferBaseUrl(req: NextRequest) {
+  const envBase = (process.env.PUBLIC_BASE_URL ?? '').trim();
+  if (envBase) return envBase;
+
+  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host');
+  const proto = req.headers.get('x-forwarded-proto') ?? 'https';
+  return host ? `${proto}://${host}` : '';
+}
 
 /**
  * SignalWire POSTs here when the browser SDK initiates an outbound call.
- * We return LaML (identical syntax to TwiML) instructing SignalWire how
- * to connect the call.
- *
- * Set this URL in SignalWire Console â†’ Voice API â†’ LaML Webhook:
- *   https://your-domain.com/api/signalwire/webhook
  */
 export async function POST(req: NextRequest) {
   try {
-    const signature = req.headers.get('x-signalwire-signature') ?? '';
-    const url       = `${appUrl}/api/signalwire/webhook`;
-    const formData  = await req.formData();
-    const params: Record<string, string> = {};
-    formData.forEach((val, key) => { params[key] = val.toString(); });
+    const baseUrl = inferBaseUrl(req);
+    const signature = req.headers.get('x-signalwire-signature') ?? req.headers.get('x-twilio-signature') ?? '';
+    const url = `${baseUrl}/api/signalwire/webhook`;
 
-    // Validate the request is genuinely from SignalWire
-    const isValid = validateSignalWireSignature(apiToken, signature, url, params);
-    if (!isValid) {
-      console.warn('[/api/signalwire/webhook] Invalid signature');
-      return new NextResponse('Forbidden', { status: 403 });
+    const formData = await req.formData();
+    const params: Record<string, string> = {};
+    formData.forEach((val, key) => {
+      params[key] = val.toString();
+    });
+
+    const authToken = getOptionalSignalWireAuthToken();
+    if (authToken) {
+      const isValid = validateSignalWireSignature(signature, url, params, authToken);
+      if (!isValid) {
+        console.warn('[/api/signalwire/webhook] Invalid signature');
+        return new NextResponse('Forbidden', { status: 403 });
+      }
+    } else {
+      console.warn('[/api/signalwire/webhook] No auth token configured; skipping signature validation.');
     }
 
-    const to = params.To;
+    const to = (params.To ?? '').trim();
     if (!to) {
       return new NextResponse(
         `<?xml version="1.0" encoding="UTF-8"?><Response><Say>No destination provided.</Say></Response>`,
@@ -38,8 +47,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const statusUrl = `${appUrl}/api/signalwire/status`;
-    const laml      = buildOutboundLaML(to, statusUrl);
+    const statusUrl = `${baseUrl}/api/signalwire/status`;
+    const laml = buildOutboundLaML(to, statusUrl);
 
     return new NextResponse(laml, {
       headers: { 'Content-Type': 'application/xml' },

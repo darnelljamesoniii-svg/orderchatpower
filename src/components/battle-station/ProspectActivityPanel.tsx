@@ -6,6 +6,7 @@ import { doc, onSnapshot, collection, query, where, orderBy, limit } from 'fireb
 import type { Lead, LPSession, AgentAlert } from '@/types';
 import { Copy, Check, Bell, ExternalLink, Phone, MapPin, User, Clock, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { buildDemoLink } from '@/lib/resend';
 
 interface ProspectActivityPanelProps {
   lead:        Lead | null;
@@ -62,10 +63,20 @@ export default function ProspectActivityPanel({
   const [copied,   setCopied]   = useState(false);
   const [alerts,   setAlerts]   = useState<AgentAlert[]>([]);
 
-  const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? '';
-  const demoLink = lead
-    ? `${appUrl}/unlock?place_id=${encodeURIComponent(lead.kgmid ?? '')}&name=${encodeURIComponent(lead.businessName ?? '')}&address=${encodeURIComponent(lead.address ?? '')}&sessionId=${encodeURIComponent(lead.sessionId ?? '')}`
+  const demoPath = lead
+    ? buildDemoLink({
+        placeId: lead.placeId,
+        kgmid: lead.kgmid,
+        sessionId: lead.sessionId ?? '',
+        businessName: lead.businessName ?? '',
+        address: lead.address ?? '',
+        absolute: false,
+      })
     : '';
+
+  const demoLink = typeof window !== 'undefined' && demoPath
+    ? `${window.location.origin}${demoPath}`
+    : demoPath;
 
   const elapsed = useElapsedTime(session?.loadedAt);
 
@@ -254,7 +265,7 @@ export default function ProspectActivityPanel({
         )}
 
         {/* Demo link */}
-        {lead && (
+        {lead && demoLink && (
           <div className="border-t border-border pt-2 space-y-1.5">
             <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Demo Link</div>
             <div className="flex items-center gap-2 bg-gray-900 rounded-lg px-2 py-1.5">
@@ -273,3 +284,4 @@ export default function ProspectActivityPanel({
     </div>
   );
 }
+

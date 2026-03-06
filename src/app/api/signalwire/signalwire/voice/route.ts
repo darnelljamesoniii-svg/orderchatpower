@@ -16,7 +16,7 @@ function inferBaseUrl(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   const baseUrl = (process.env.PUBLIC_BASE_URL ?? '').trim() || inferBaseUrl(req);
-  const statusUrl = `${baseUrl}/api/calls/status`;
+  const statusUrl = `${baseUrl}/api/signalwire/status`;
 
   const contentType = req.headers.get('content-type') ?? '';
   let to = '';
@@ -47,3 +47,4 @@ export async function POST(req: NextRequest) {
 
   return new Response(xml, { status: 200, headers: { 'Content-Type': 'text/xml' } });
 }
+

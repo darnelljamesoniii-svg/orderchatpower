@@ -1,3 +1,3 @@
-﻿declare module '@signalwire/compatibility-api' {
+declare module '@signalwire/compatibility-api' {
   export const RestClient: any
 }

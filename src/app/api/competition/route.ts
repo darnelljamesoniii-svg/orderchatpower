@@ -1,4 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  getPlaceDetails,
+  getNearbyCompetitors,
+  milesToMetres,
+  type NearbyPlace,
+} from '@/lib/google-places';
+import { generateStingMessage } from '@/lib/gemini-concierge';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -6,15 +13,12 @@ export const dynamic = 'force-dynamic';
 function getApiKey() {
   return (
     process.env.GOOGLE_MAPS_API_KEY?.trim() ||
+    process.env.GOOGLE_PLACES_API_KEY?.trim() ||
     process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ||
     ''
   );
 }
 
-/**
- * If placeId is already a ChIJ... Place ID, return it.
- * If it's a /g/... feature id, resolve using name+address (NOT the /g/... string).
- */
 async function resolvePlaceId(args: {
   placeId: string;
   name?: string;
@@ -48,10 +52,24 @@ async function resolvePlaceId(args: {
   return data.candidates[0].place_id;
 }
 
-async function handle(reqData: { placeId?: string; place_id?: string; name?: string; address?: string }) {
+function pickStingCompetitor(candidates: NearbyPlace[]): NearbyPlace | null {
+  if (!candidates.length) return null;
+  return [...candidates].sort((a, b) => {
+    const ratingDiff = (b.rating ?? 0) - (a.rating ?? 0);
+    if (ratingDiff !== 0) return ratingDiff;
+    return (a.distanceMetres ?? Number.MAX_SAFE_INTEGER) - (b.distanceMetres ?? Number.MAX_SAFE_INTEGER);
+  })[0] ?? null;
+}
+
+async function handle(reqData: {
+  placeId?: string;
+  place_id?: string;
+  name?: string;
+  address?: string;
+}) {
   const apiKey = getApiKey();
   if (!apiKey) {
-    return NextResponse.json({ ok: false, error: 'Missing GOOGLE_MAPS_API_KEY' }, { status: 500 });
+    return NextResponse.json({ ok: false, error: 'Missing Google Maps/Places API key' }, { status: 500 });
   }
 
   const placeId = (reqData.placeId ?? reqData.place_id ?? '').toString().trim();
@@ -72,29 +90,56 @@ async function handle(reqData: { placeId?: string; place_id?: string; name?: str
     );
   }
 
-  const detailsUrl =
-    `https://maps.googleapis.com/maps/api/place/details/json` +
-    `?place_id=${encodeURIComponent(finalPlaceId)}` +
-    `&fields=place_id,name,types,formatted_address,geometry,website,rating,user_ratings_total` +
-    `&key=${encodeURIComponent(apiKey)}`;
+  try {
+    const business = await getPlaceDetails(finalPlaceId);
 
-  const detailsRes = await fetch(detailsUrl);
-  const detailsData = await detailsRes.json();
+    const [tier1, tier2, tier3] = await Promise.all([
+      getNearbyCompetitors(business.location, milesToMetres(1), business.category, finalPlaceId),
+      getNearbyCompetitors(business.location, milesToMetres(3), business.category, finalPlaceId),
+      getNearbyCompetitors(business.location, milesToMetres(5), business.category, finalPlaceId),
+    ]);
 
-  if (detailsData?.status !== 'OK') {
+    const stingCompetitor =
+      pickStingCompetitor(tier1) ??
+      pickStingCompetitor(tier2) ??
+      pickStingCompetitor(tier3);
+
+    let stingMessage = '';
+    if (stingCompetitor) {
+      try {
+        stingMessage = await generateStingMessage(
+          business.name,
+          stingCompetitor.name,
+          tier1.length,
+        );
+      } catch {
+        stingMessage = `Customers near you are being recommended to ${stingCompetitor.name}.`;
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      placeId: finalPlaceId,
+      business,
+      competitors: {
+        tier1,
+        tier2,
+        tier3,
+      },
+      counts: {
+        tier1: tier1.length,
+        tier2: tier2.length,
+        tier3: tier3.length,
+      },
+      stingCompetitor,
+      stingMessage,
+    });
+  } catch (e: any) {
     return NextResponse.json(
-      { ok: false, error: `Place Details failed: ${detailsData?.status ?? 'UNKNOWN'}` },
-      { status: 400 }
+      { ok: false, error: e?.message ?? 'Failed to load competition data' },
+      { status: 500 }
     );
   }
-
-  return NextResponse.json({
-    ok: true,
-    placeId: finalPlaceId,
-    name: detailsData?.result?.name ?? null,
-    address: detailsData?.result?.formatted_address ?? null,
-    result: detailsData?.result ?? null,
-  });
 }
 
 export async function GET(req: NextRequest) {

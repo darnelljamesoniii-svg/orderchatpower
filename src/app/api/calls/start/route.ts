@@ -23,21 +23,18 @@ function normalizeE164(input: string): string {
   const raw = (input ?? '').toString().trim();
   if (!raw) return '';
 
-  // Keep +, strip everything else non-digit
   const hasPlus = raw.startsWith('+');
   const digits = raw.replace(/[^\d]/g, '');
 
   if (hasPlus) return `+${digits}`;
   if (digits.length === 10) return `+1${digits}`;
   if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
-  // fallback: if it already looks like country+number without plus
   if (digits.length >= 11) return `+${digits}`;
-  return raw; // let upstream error if it’s truly invalid
+  return raw;
 }
 
 export async function POST(req: Request) {
-  const startedAt = new Date();
-  const startedAtIso = startedAt.toISOString();
+  const startedAtIso = new Date().toISOString();
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -52,14 +49,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Firebase Admin not initialized' }, { status: 500 });
     }
 
-    // ---- Idempotency lock (prevents double call within ~30s) ----
-    // No index required because we use a deterministic doc id (no query).
-    const bucket = Math.floor(Date.now() / 30_000); // 30-second window
+    const bucket = Math.floor(Date.now() / 30_000);
     const callLogId = `${leadId}_${agentId}_${bucket}`;
-    const callLogsCol = adminDb.collection(COLLECTIONS.CALL_LOGS || 'call_logs');
-    const callLogRef = callLogsCol.doc(callLogId);
+    const callLogRef = adminDb.collection(COLLECTIONS.CALL_LOGS || 'call_logs').doc(callLogId);
 
-    // Try to reserve the lock (or reuse if already created)
     const existing = await adminDb.runTransaction(async (tx) => {
       const snap = await tx.get(callLogRef);
       if (snap.exists) {
@@ -77,17 +70,16 @@ export async function POST(req: Request) {
       return { exists: false, callSid: null, status: 'CREATING' };
     });
 
-    // If a duplicate request comes in while the first is still working, return whatever we have
     if (existing.exists) {
       return NextResponse.json({
         ok: true,
         callSid: existing.callSid,
+        callLogId,
         deduped: true,
         status: existing.status,
       });
     }
 
-    // ---- Load lead ----
     const leadSnap = await adminDb.collection(COLLECTIONS.LEADS).doc(leadId).get();
     if (!leadSnap.exists) {
       await callLogRef.set(
@@ -98,7 +90,6 @@ export async function POST(req: Request) {
     }
 
     const lead = leadSnap.data() as any;
-
     const toNumberRaw = (lead?.phone ?? '').toString().trim();
     const toNumber = normalizeE164(toNumberRaw);
     if (!toNumber || !toNumber.startsWith('+')) {
@@ -118,9 +109,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Unable to determine base URL' }, { status: 500 });
     }
 
-    const statusUrl = `${baseUrl}/api/calls/status`;
-
-    // Get + normalize FROM
+    const statusUrl = `${baseUrl}/api/signalwire/status`;
     const fromNumber = normalizeE164(getFromNumber());
     if (!fromNumber || !fromNumber.startsWith('+')) {
       await callLogRef.set(
@@ -133,11 +122,9 @@ export async function POST(req: Request) {
       );
     }
 
-    // ---- Create call ----
     const call = await getSwClient().calls.create({
       to: toNumber,
       from: fromNumber,
-      // NOTE: buildOutboundLaML should set callerId=fromNumber and action=statusUrl (fine if it does)
       twiml: buildOutboundLaML(toNumber, statusUrl),
       statusCallback: statusUrl,
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
@@ -157,7 +144,7 @@ export async function POST(req: Request) {
       { merge: true }
     );
 
-    return NextResponse.json({ ok: true, callSid });
+    return NextResponse.json({ ok: true, callSid, callLogId });
   } catch (err: any) {
     console.error('[/api/calls/start] Call create failed:', {
       message: err?.message,
