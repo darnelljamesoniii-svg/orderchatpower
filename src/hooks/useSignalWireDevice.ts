@@ -17,11 +17,25 @@ interface UseSignalWireDeviceOptions {
   onError?: (error: Error) => void;
 }
 
-interface MakeCallResponse {
+type BrowserTokenResponse = {
   ok?: boolean;
-  callSid?: string | null;
-  callLogId?: string | null;
+  project?: string;
+  token?: string;
   error?: string;
+};
+
+function normalizeE164(input: string): string {
+  const raw = (input ?? '').toString().trim();
+  if (!raw) return '';
+
+  const hasPlus = raw.startsWith('+');
+  const digits = raw.replace(/[^\d]/g, '');
+
+  if (hasPlus) return `+${digits}`;
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  if (digits.length >= 11) return `+${digits}`;
+  return raw;
 }
 
 export function useSignalWireDevice({
@@ -36,6 +50,8 @@ export function useSignalWireDevice({
   const [duration, setDuration] = useState(0);
 
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const clientRef = useRef<any>(null);
+  const callRef = useRef<any>(null);
 
   const stopTimer = useCallback(() => {
     if (tickRef.current) {
@@ -51,40 +67,105 @@ export function useSignalWireDevice({
     }, 1000);
   }, [stopTimer]);
 
+  const cleanupCall = useCallback(() => {
+    stopTimer();
+    callRef.current = null;
+    setCallSid(null);
+    setDuration(0);
+    setState('idle');
+    onCallDisconnected?.();
+  }, [onCallDisconnected, stopTimer]);
+
   useEffect(() => () => stopTimer(), [stopTimer]);
 
-  const makeCall = useCallback(async (_toE164: string, leadId?: string) => {
+  const ensureClient = useCallback(async () => {
+    if (clientRef.current) return clientRef.current;
+
+    const tokenRes = await fetch('/api/signalwire/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agentId }),
+    });
+
+    const tokenData = (await tokenRes.json()) as BrowserTokenResponse;
+    if (!tokenRes.ok || !tokenData?.project || !tokenData?.token) {
+      throw new Error(tokenData?.error ?? 'Unable to initialize browser calling token');
+    }
+
+    const mod = await import('@signalwire/js');
+    const client = await mod.SignalWire({
+      project: tokenData.project,
+      token: tokenData.token,
+    } as any);
+
+    clientRef.current = client;
+    return client;
+  }, [agentId]);
+
+  const makeCall = useCallback(async (toRaw: string, leadId?: string) => {
     try {
       setError(null);
       setState('connecting');
+      setDuration(0);
+
+      const to = normalizeE164(toRaw);
+      if (!to || !to.startsWith('+')) {
+        throw new Error('Lead missing/invalid phone number');
+      }
 
       if (!leadId) {
         throw new Error('leadId is required to start a call.');
       }
 
-      const res = await fetch('/api/calls/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leadId, agentId }),
+      const client = await ensureClient();
+      const call = await client.dial({
+        to,
+        audio: true,
+        video: false,
+        negotiateAudio: true,
+        negotiateVideo: false,
       });
 
-      const data = (await res.json()) as MakeCallResponse;
-      if (!res.ok || !data?.ok) {
-        throw new Error(data?.error ?? 'Failed to start call.');
-      }
-
-      const sid = data.callSid ?? null;
-      setCallSid(sid);
-      setDuration(0);
-
+      callRef.current = call;
       setState('ringing');
-      window.setTimeout(() => {
+
+      call.on('call.state', (evt: any) => {
+        const nextState = String(evt?.callState ?? evt?.call_state ?? evt?.state ?? '').toLowerCase();
+
+        if (nextState.includes('ring')) {
+          setState('ringing');
+          return;
+        }
+
+        if (nextState.includes('answer') || nextState.includes('active') || nextState.includes('progress')) {
+          setState('in-call');
+          startTimer();
+          onCallConnected?.({ callSid: null, callLogId: null });
+          return;
+        }
+
+        if (
+          nextState.includes('end') ||
+          nextState.includes('hangup') ||
+          nextState.includes('fail') ||
+          nextState.includes('busy') ||
+          nextState.includes('complete')
+        ) {
+          cleanupCall();
+        }
+      });
+
+      call.once('destroy', () => {
+        cleanupCall();
+      });
+
+      call.once('room.subscribed', () => {
         setState('in-call');
         startTimer();
-        onCallConnected?.({ callSid: sid, callLogId: data.callLogId ?? null });
-      }, 700);
+        onCallConnected?.({ callSid: null, callLogId: null });
+      });
 
-      return { callSid: sid, callLogId: data.callLogId ?? null };
+      return { callSid: null, callLogId: null };
     } catch (err: any) {
       const wrapped = err instanceof Error ? err : new Error(err?.message ?? 'Call failed');
       setError(wrapped.message);
@@ -92,30 +173,35 @@ export function useSignalWireDevice({
       onError?.(wrapped);
       return null;
     }
-  }, [agentId, onCallConnected, onError, startTimer]);
+  }, [cleanupCall, ensureClient, onCallConnected, onError, startTimer]);
 
   const hangUp = useCallback(async () => {
     setState('disconnecting');
 
     try {
-      if (callSid) {
-        await fetch('/api/calls/hangup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ callSid }),
-        }).catch(() => {});
+      if (callRef.current && typeof callRef.current.hangup === 'function') {
+        await callRef.current.hangup();
       }
+    } catch {
+      // best effort
     } finally {
-      stopTimer();
-      setState('idle');
-      setCallSid(null);
-      setDuration(0);
-      onCallDisconnected?.();
+      cleanupCall();
     }
-  }, [callSid, onCallDisconnected, stopTimer]);
+  }, [cleanupCall]);
 
-  const mute = useCallback((_muted: boolean) => {
-    // Server-initiated calling path does not expose browser media tracks yet.
+  const mute = useCallback(async (muted: boolean) => {
+    const call = callRef.current;
+    if (!call) return;
+
+    try {
+      if (muted) {
+        await call.audioMute?.();
+      } else {
+        await call.audioUnmute?.();
+      }
+    } catch {
+      // best effort
+    }
   }, []);
 
   const reinit = useCallback(async () => {
@@ -124,6 +210,23 @@ export function useSignalWireDevice({
     setState('idle');
     setCallSid(null);
     setDuration(0);
+
+    try {
+      if (callRef.current?.hangup) {
+        await callRef.current.hangup();
+      }
+    } catch {
+      // best effort
+    }
+
+    callRef.current = null;
+
+    try {
+      await clientRef.current?.disconnect?.();
+    } catch {
+      // best effort
+    }
+    clientRef.current = null;
   }, [stopTimer]);
 
   return { state, error, callSid, duration, makeCall, hangUp, mute, reinit };

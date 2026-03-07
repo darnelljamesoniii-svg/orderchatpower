@@ -65,7 +65,7 @@ export default function ProspectActivityPanel({
 
   const demoPath = lead
     ? buildDemoLink({
-        placeId: lead.placeId,
+        placeId: lead.placeId ?? ((lead as any).place_id as string | undefined),
         kgmid: lead.kgmid,
         sessionId: lead.sessionId ?? '',
         businessName: lead.businessName ?? '',
@@ -284,4 +284,5 @@ export default function ProspectActivityPanel({
     </div>
   );
 }
+
 

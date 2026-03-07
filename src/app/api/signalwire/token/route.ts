@@ -1,38 +1,43 @@
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
 
 /**
  * POST /api/signalwire/token
  * Body: { agentId?: string }
- * Returns: { token: string }
+ * Returns: { ok, project, token }
+ *
+ * NOTE: This uses project token directly for internal softphone testing.
  */
-export async function POST(req: Request) {
+export async function POST(_req: Request) {
   try {
-    const body: any = await req.json().catch(() => ({}));
-    const agentId =
-      typeof body?.agentId === "string" && body.agentId.trim()
-        ? body.agentId.trim()
-        : "agent";
+    const project = (process.env.SIGNALWIRE_PROJECT_ID ?? '').trim();
+    const token = (
+      process.env.SIGNALWIRE_API_TOKEN ??
+      process.env.SIGNALWIRE_REST_API_TOKEN ??
+      ''
+    ).trim();
 
-    // IMPORTANT: avoid top-level import crashing the route
-    const { generateAccessToken } = await import("@/lib/signalwire-server");
+    if (!project || !token) {
+      return NextResponse.json(
+        { ok: false, error: 'Missing SIGNALWIRE_PROJECT_ID or SIGNALWIRE_API_TOKEN' },
+        { status: 500 }
+      );
+    }
 
-    const token = await generateAccessToken(agentId);
-    return NextResponse.json({ token }, { status: 200 });
+    return NextResponse.json({ ok: true, project, token }, { status: 200 });
   } catch (err: any) {
     return NextResponse.json(
-      { error: err?.message ?? "Token generation failed" },
+      { ok: false, error: err?.message ?? 'Token generation failed' },
       { status: 500 }
     );
   }
 }
 
-// Optional: helpful GET response
 export async function GET() {
   return NextResponse.json(
-    { ok: true, message: "Use POST with JSON body: { agentId: string }" },
+    { ok: true, message: 'Use POST to retrieve browser calling credentials.' },
     { status: 200 }
   );
 }

@@ -2,21 +2,8 @@ import { getAdminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS } from '@/lib/collections';
 import type { Lead } from '@/types';
 
-const adminDb = getAdminDb();
-
 export interface CsvRow {
   businessName: string;
-<<<<<<< HEAD
-  Full_Address: string;
-  City: string;
-  Website?: string;
-  Email_From_WEBSITE?: string;
-  Phone_1?: string;
-  Zip?: string;
-  Place_ID: string;
-  contactName?: string;
-  campaign?: string;
-=======
   Full_Address?: string;
   City?: string;
   Website?: string;
@@ -25,8 +12,7 @@ export interface CsvRow {
   Zip?: string;
   Place_ID?: string;
   contactName: string;
-  campaign?: 'wave1' | 'wave2';
->>>>>>> b51d70c (Fix demo links and SignalWire calling/callback flow)
+  campaign?: 'wave1' | 'wave2' | string;
 }
 
 export interface ImportResult {
@@ -35,27 +21,6 @@ export interface ImportResult {
   errors: string[];
 }
 
-<<<<<<< HEAD
-/**
- * Normalizes a phone number to E.164 when possible.
- * Returns undefined if blank.
- */
-function normalisePhone(phone?: string): string | undefined {
-  if (!phone) return undefined;
-  const digits = String(phone).replace(/\D/g, '');
-  if (!digits) return undefined;
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
-  return `+${digits}`;
-}
-
-/**
- * Imports rows into Firestore using Place_ID as the source of truth.
- * Dedupe priority:
- *   1) Place_ID
- *   2) normalized phone (if present)
- */
-=======
 function normalisePhone(phone: string): string {
   const digits = String(phone || '').replace(/\D/g, '');
 
@@ -114,31 +79,27 @@ function deriveTimezone(row: CsvRow): { timezone: string; utcOffsetHours: number
   return { timezone: 'America/New_York', utcOffsetHours: -5 };
 }
 
->>>>>>> b51d70c (Fix demo links and SignalWire calling/callback flow)
 export async function importLeads(rows: CsvRow[]): Promise<ImportResult> {
   const adminDb = getAdminDb();
   const leadsRef = adminDb.collection(COLLECTIONS.LEADS);
   const result: ImportResult = { imported: 0, duplicates: 0, errors: [] };
 
-<<<<<<< HEAD
-  const existingSnap = await leadsRef.select('place_id', 'phone').get();
+  const existingSnap = await leadsRef.select('phone', 'placeId').get();
+  const existingPhones = new Set<string>();
   const existingPlaceIds = new Set<string>();
-  const existingPhones = new Set<string>();
 
-  existingSnap.docs.forEach((d) => {
-    const data = d.data();
-    if (data.place_id) existingPlaceIds.add(String(data.place_id).trim());
-    if (data.phone) existingPhones.add(String(data.phone).trim());
-=======
-  const existingPhonesSnap = await leadsRef.select('phone').get();
-  const existingPhones = new Set<string>();
-
-  existingPhonesSnap.docs.forEach((doc) => {
-    const data = doc.data();
+  existingSnap.docs.forEach((doc) => {
+    const data = doc.data() as any;
     if (data.phone) {
-      existingPhones.add(normalisePhone(String(data.phone)));
+      try {
+        existingPhones.add(normalisePhone(String(data.phone)));
+      } catch {
+        // ignore malformed stored phone
+      }
     }
->>>>>>> b51d70c (Fix demo links and SignalWire calling/callback flow)
+    if (data.placeId) {
+      existingPlaceIds.add(String(data.placeId).trim());
+    }
   });
 
   const BATCH_SIZE = 450;
@@ -149,12 +110,6 @@ export async function importLeads(rows: CsvRow[]): Promise<ImportResult> {
     const row = rows[i];
 
     try {
-<<<<<<< HEAD
-      const placeId = String(row.Place_ID || '').trim();
-      if (!placeId) {
-        result.errors.push(`Row ${i + 1}: Missing Place_ID`);
-        continue;
-=======
       if (!row.businessName?.trim()) {
         throw new Error('Missing businessName');
       }
@@ -165,76 +120,42 @@ export async function importLeads(rows: CsvRow[]): Promise<ImportResult> {
 
       if (!row.Phone_1?.trim()) {
         throw new Error('Missing Phone_1');
->>>>>>> b51d70c (Fix demo links and SignalWire calling/callback flow)
       }
 
       const normPhone = normalisePhone(row.Phone_1);
+      const placeId = row.Place_ID?.trim() || '';
 
-<<<<<<< HEAD
-      if (existingPlaceIds.has(placeId) || (normPhone && existingPhones.has(normPhone))) {
-=======
-      if (existingPhones.has(normPhone)) {
->>>>>>> b51d70c (Fix demo links and SignalWire calling/callback flow)
+      if (existingPhones.has(normPhone) || (placeId && existingPlaceIds.has(placeId))) {
         result.duplicates++;
         continue;
       }
 
-<<<<<<< HEAD
-      const now = new Date().toISOString();
-
-      const lead: Omit<Lead, 'id'> & {
-        place_id: string;
-        city?: string;
-        zip?: string;
-        website?: string;
-      } = {
-        businessName: String(row.businessName || '').trim(),
-        contactName: String(row.contactName || '').trim() || undefined,
-        phone: normPhone,
-        email: String(row.Email_From_WEBSITE || '').trim() || undefined,
-        address: String(row.Full_Address || '').trim() || undefined,
-        city: String(row.City || '').trim() || undefined,
-        zip: String(row.Zip || '').trim() || undefined,
-        website: String(row.Website || '').trim() || undefined,
-        place_id: placeId,
-        status: 'NEW',
-        retryCount: 0,
-        campaign: row.campaign ?? 'general',
-=======
       const { timezone, utcOffsetHours } = deriveTimezone(row);
       const now = new Date().toISOString();
 
       const lead: Omit<Lead, 'id'> = {
         businessName: row.businessName.trim(),
-        placeId: row.Place_ID?.trim() || undefined,
+        placeId: placeId || undefined,
         contactName: row.contactName.trim(),
         phone: normPhone,
         email: row.Email_From_WEBSITE?.trim() || undefined,
         address: row.Full_Address?.trim() || undefined,
+        website: row.Website?.trim() || undefined,
+        city: row.City?.trim() || undefined,
         timezone,
         utcOffsetHours,
         status: 'NEW',
         retryCount: 0,
         campaign: row.campaign ?? 'wave1',
->>>>>>> b51d70c (Fix demo links and SignalWire calling/callback flow)
         createdAt: now,
         updatedAt: now,
       };
 
-<<<<<<< HEAD
-      // Use Place_ID as the Firestore document ID for easy lookup/testing
-      batch.set(leadsRef.doc(placeId), lead, { merge: true });
-
-      existingPlaceIds.add(placeId);
-      if (normPhone) existingPhones.add(normPhone);
-
-      batchCount++;
-=======
       const docRef = leadsRef.doc();
       batch.set(docRef, lead);
 
       existingPhones.add(normPhone);
->>>>>>> b51d70c (Fix demo links and SignalWire calling/callback flow)
+      if (placeId) existingPlaceIds.add(placeId);
       result.imported++;
       batchCount++;
 
@@ -244,13 +165,7 @@ export async function importLeads(rows: CsvRow[]): Promise<ImportResult> {
         batchCount = 0;
       }
     } catch (err: unknown) {
-      result.errors.push(
-<<<<<<< HEAD
-        `Row ${i + 1}: ${err instanceof Error ? err.message : String(err)}`
-=======
-        `Row ${i + 2}: ${err instanceof Error ? err.message : String(err)}`
->>>>>>> b51d70c (Fix demo links and SignalWire calling/callback flow)
-      );
+      result.errors.push(`Row ${i + 2}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

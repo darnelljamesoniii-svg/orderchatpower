@@ -163,7 +163,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
 
   const demoHref = currentLead
     ? buildDemoLink({
-        placeId: currentLead.placeId,
+        placeId: currentLead.placeId ?? ((currentLead as any).place_id as string | undefined),
         kgmid: currentLead.kgmid,
         sessionId: currentLead.sessionId ?? '',
         businessName: currentLead.businessName ?? '',
@@ -337,6 +337,7 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
     </div>
   );
 }
+
 
 
 
