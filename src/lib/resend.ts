@@ -64,7 +64,9 @@ export function resolveLeadPlaceId(input: { placeId?: string; kgmid?: string }):
 }
 
 function buildUnlockPath(input: DemoLinkInput): string {
-  const placeId = resolveLeadPlaceId(input);
+  const resolvedPlaceId = resolveLeadPlaceId(input);
+  const fallbackLookupPlaceId = (input.businessName || input.address) ? '/g/lookup' : '';
+  const placeId = resolvedPlaceId || fallbackLookupPlaceId;
   if (!placeId) return '';
 
   const params = new URLSearchParams();
@@ -177,3 +179,4 @@ Looking forward to hearing from you,
 ${agentName}
 AgenticLife`;
 }
+
