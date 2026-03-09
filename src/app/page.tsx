@@ -265,7 +265,7 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
 }
 
 // ── Concierge Demo Iframe ─────────────────────────────────────────────────────
-function ConciergeDemoFrame({ placeId }: { placeId?: string }) {
+function ConciergeDemoFrame({ placeId, keyword }: { placeId?: string; keyword?: string }) {
   const src = placeId
     ? `/concierge?place_id=${encodeURIComponent(placeId)}`
     : '/concierge';
@@ -295,6 +295,9 @@ function UnlockPageContent() {
   const params        = useSearchParams();
   const placeId       = params.get('place_id');
   const sessionId     = params.get('sessionId') ?? undefined;
+  const businessName  = params.get('name') ?? '';
+  const businessAddr  = params.get('address') ?? '';
+  const keyword       = params.get('keyword') ?? '';
   const agentId       = params.get('agentId')   ?? undefined;
   const agentPreview  = params.get('agent_preview') === 'true'; // agent viewing in Battle Station
 
@@ -325,7 +328,7 @@ function UnlockPageContent() {
   useEffect(() => {
     if (!placeId) { setError('No business ID provided.'); setLoading(false); return; }
 
-    fetch(`/api/competition?place_id=${encodeURIComponent(placeId)}`)
+    fetch(`/api/competition?place_id=${encodeURIComponent(placeId)}${businessName ? `&name=${encodeURIComponent(businessName)}` : ''}${businessAddr ? `&address=${encodeURIComponent(businessAddr)}` : ''}${keyword ? `&keyword=${encodeURIComponent(keyword)}` : ''}`)
       .then(r => r.json())
       .then(data => {
         if (data.error) throw new Error(data.error);
@@ -337,7 +340,7 @@ function UnlockPageContent() {
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, [placeId]);
+  }, [placeId, businessName, businessAddr, keyword]);
 
   // Recalculate pricing when avgTicket or counts change
   useEffect(() => {
@@ -474,7 +477,7 @@ function UnlockPageContent() {
                 onDone={() => { setStingDone(true); track.stingCompleted(); }}
               />
             ) : (
-              <ConciergeDemoFrame placeId={placeId} />
+              <ConciergeDemoFrame placeId={placeId} keyword={keyword} />
             )}
           </div>
 

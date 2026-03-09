@@ -238,7 +238,7 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
   );
 }
 
-function ConciergeDemoFrame({ placeId }: { placeId?: string }) {
+function ConciergeDemoFrame({ placeId, keyword }: { placeId?: string; keyword?: string }) {
   const src = placeId
     ? `/concierge?place_id=${encodeURIComponent(placeId)}`
     : '/concierge';
@@ -270,6 +270,7 @@ function UnlockPageContent() {
   const agentPreview = params.get('agent_preview') === 'true';
   const businessName = params.get('name')          ?? '';
   const businessAddr = params.get('address')       ?? '';
+  const keyword      = params.get('keyword')       ?? '';
 
   const [business,      setBusiness]      = useState<PlaceDetails | null>(null);
   const [stingComp,     setStingComp]     = useState<NearbyPlace | null>(null);
@@ -295,7 +296,7 @@ function UnlockPageContent() {
 
   useEffect(() => {
     if (!placeId) { setError('No business ID provided.'); setLoading(false); return; }
-    fetch(`/api/competition?place_id=${encodeURIComponent(placeId)}&name=${encodeURIComponent(businessName)}&address=${encodeURIComponent(businessAddr)}`)
+    fetch(`/api/competition?place_id=${encodeURIComponent(placeId)}&name=${encodeURIComponent(businessName)}&address=${encodeURIComponent(businessAddr)}${keyword ? `&keyword=${encodeURIComponent(keyword)}` : ''}`)
       .then(r => r.json())
       .then(data => {
         if (data.error) throw new Error(data.error);
@@ -307,7 +308,7 @@ function UnlockPageContent() {
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, [placeId]);
+  }, [placeId, businessName, businessAddr, keyword]);
 
   useEffect(() => {
     if (!counts) return;
@@ -432,7 +433,7 @@ function UnlockPageContent() {
                 onDone={() => { setStingDone(true); track.stingCompleted(); }}
               />
             ) : (
-              <ConciergeDemoFrame placeId={placeId} />
+              <ConciergeDemoFrame placeId={placeId} keyword={keyword} />
             )}
           </div>
 

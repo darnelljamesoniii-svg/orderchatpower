@@ -195,6 +195,7 @@ const App = () => {
   const [counts, setCounts] = useState({ tier1: 0, tier2: 0, tier3: 0 });
   const [pricings, setPricings] = useState(null);
   const [category, setCategory] = useState('Restaurant');
+  const keyword = (params?.get('keyword') ?? '').trim();
   const [avgTicket, setAvgTicket] = useState(28);
   const [loading, setLoading] = useState(true);
   const [lockSuccess, setLockSuccess] = useState(false);
@@ -246,7 +247,7 @@ const App = () => {
     const pull = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/competition?place_id=${encodeURIComponent(placeId)}&category=${encodeURIComponent(category)}`);
+        const res = await fetch(`/api/competition?place_id=${encodeURIComponent(placeId)}&category=${encodeURIComponent(category)}${keyword ? `&keyword=${encodeURIComponent(keyword)}` : ''}`);
         const data = await res.json();
         const bData = data.business || data.lead;
         if (bData) {
@@ -259,7 +260,7 @@ const App = () => {
       }
     };
     pull();
-  }, [params, category]);
+  }, [params, category, keyword]);
 
   // 5. Pricing ROI
   useEffect(() => {
