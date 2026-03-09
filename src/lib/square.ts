@@ -38,6 +38,13 @@ export async function createSquarePaymentLink(params: CreatePaymentLinkParams): 
       allow_tipping:     false,
       redirect_url:      `${process.env.NEXT_PUBLIC_APP_URL}/sales/success`,
       merchant_support_email: 'support@agenticlife.com',
+      accepted_payment_methods: {
+        card: true,
+        apple_pay: true,
+        google_pay: true,
+        cash_app_pay: true,
+        afterpay_clearpay: true,
+      },
     },
   };
 
