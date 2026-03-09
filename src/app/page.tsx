@@ -96,7 +96,7 @@ function ROIBadge({ roi }: { roi: TierPricing['roi'] }) {
           <div className="text-gray-400 text-xs">to break even</div>
         </div>
       </div>
-      <div className="text-gray-500 text-[10px]">Based on 2 new orders/day per knocked-out competitor</div>
+      <div className="text-gray-500 text-[10px]">Based on tier ROI targets with AOV-adjusted order volume</div>
     </div>
   );
 }
