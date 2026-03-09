@@ -99,16 +99,34 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
   const activeCampaignIds = activeCampaigns.map(c => c.id).filter(Boolean);
 
   // Query NEW leads broadly, then apply campaign-aware window filtering in memory.
-  const newSnap = await leadsRef
-    .where('status', '==', 'NEW')
-    .orderBy('createdAt', 'asc')
-    .limit(50)
-    .get();
+  let newSnap: FirebaseFirestore.QuerySnapshot;
+  try {
+    newSnap = await leadsRef
+      .where('status', '==', 'NEW')
+      .orderBy('createdAt', 'asc')
+      .limit(50)
+      .get();
+  } catch (err: any) {
+    const isMissingIndex = err?.code === 9 || /requires an index/i.test(String(err?.message ?? ''));
+    if (!isMissingIndex) throw err;
+
+    // Graceful fallback while a composite index is being created.
+    newSnap = await leadsRef
+      .where('status', '==', 'NEW')
+      .limit(200)
+      .get();
+  }
 
   const waveMap  = Object.fromEntries(activeCampaigns.map(c => [c.id, c]));
   const hasActiveCampaigns = activeCampaignIds.length > 0;
   const newLeads = newSnap.docs
     .map(d => ({ id: d.id, ...d.data() } as Lead))
+    .sort((a, b) => {
+      const aTs = Date.parse((a.createdAt as string) ?? '');
+      const bTs = Date.parse((b.createdAt as string) ?? '');
+      return (Number.isFinite(aTs) ? aTs : Number.MAX_SAFE_INTEGER)
+        - (Number.isFinite(bTs) ? bTs : Number.MAX_SAFE_INTEGER);
+    })
     .filter((l) => {
       const wave = waveMap[l.campaign];
       if (wave) {

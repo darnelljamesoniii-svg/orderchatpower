@@ -31,6 +31,7 @@ export async function POST(req: Request) {
     const apiToken = (
       process.env.SIGNALWIRE_API_TOKEN ??
       process.env.SIGNALWIRE_REST_API_TOKEN ??
+      process.env.SIGNALWIRE_AUTH_TOKEN ??
       ''
     ).trim();
     const spaceBase = normalizeSpaceUrl(process.env.SIGNALWIRE_SPACE_URL ?? '');
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           ok: false,
-          error: 'Missing SIGNALWIRE_PROJECT_ID, SIGNALWIRE_API_TOKEN, or SIGNALWIRE_SPACE_URL',
+          error: 'Missing SIGNALWIRE_PROJECT_ID, one of SIGNALWIRE_API_TOKEN|SIGNALWIRE_REST_API_TOKEN|SIGNALWIRE_AUTH_TOKEN, or SIGNALWIRE_SPACE_URL',
         },
         { status: 500 }
       );

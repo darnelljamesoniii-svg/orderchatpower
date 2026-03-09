@@ -22,6 +22,7 @@ type BrowserTokenResponse = {
   project?: string;
   token?: string;
   error?: string;
+  details?: unknown;
 };
 
 function normalizeE164(input: string): string {
@@ -97,7 +98,12 @@ export function useSignalWireDevice({
 
     const tokenData = (await tokenRes.json()) as BrowserTokenResponse;
     if (!tokenRes.ok || !tokenData?.token) {
-      throw new Error(tokenData?.error ?? 'Unable to initialize browser calling token');
+      const detail = tokenData?.details ? JSON.stringify(tokenData.details) : '';
+      throw new Error(
+        `Token init failed (${tokenRes.status}): ${
+          tokenData?.error ?? 'Unable to initialize browser calling token'
+        }${detail ? ` | ${detail}` : ''}`
+      );
     }
 
     const mod = await import('@signalwire/js');
