@@ -180,13 +180,13 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchNearbyPages(urlBase: string): Promise<NearbySearchResultItem[]> {
+async function fetchNearbyPages(urlBase: string, maxPages = 2): Promise<NearbySearchResultItem[]> {
   const allResults: NearbySearchResultItem[] = [];
   let nextPageToken = '';
 
   // Google Nearby Search returns up to 20 per page; 2 pages gives better accuracy
   // without adding too much latency for unlock rendering.
-  const MAX_PAGES = 2;
+  const MAX_PAGES = Math.max(1, Math.min(maxPages, 5));
 
   for (let page = 0; page < MAX_PAGES; page++) {
     const pageUrl = nextPageToken
@@ -282,6 +282,8 @@ export async function getNearbyCompetitors(
   radiusMetres:   number,
   category:       string,
   excludePlaceId: string,
+  keyword?:       string,
+  maxPages = 2,
 ): Promise<NearbyPlace[]> {
   const type   = categoryToGoogleType(category);
   const params = new URLSearchParams({
@@ -289,10 +291,11 @@ export async function getNearbyCompetitors(
     radius:   String(Math.min(radiusMetres, 50_000)),
     type,
     key: KEY,
+    ...(keyword ? { keyword } : {}),
   });
 
   const url = `${BASE}/place/nearbysearch/json?${params}`;
-  const results = await fetchNearbyPages(url);
+  const results = await fetchNearbyPages(url, maxPages);
 
   return results
     .filter((p) => p.place_id !== excludePlaceId)
@@ -387,3 +390,4 @@ export function metrestoReadable(m: number): string {
 export function metresToMiles(m: number): string {
   return `${(m / 1609.34).toFixed(1)} mi`;
 }
+

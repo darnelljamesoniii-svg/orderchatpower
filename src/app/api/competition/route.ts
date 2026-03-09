@@ -70,6 +70,7 @@ async function handle(reqData: {
   name?: string;
   address?: string;
   category?: string;
+  keyword?: string;
   refresh?: boolean;
 }) {
   const apiKey = getApiKey();
@@ -81,6 +82,7 @@ async function handle(reqData: {
   const name = (reqData.name ?? '').toString().trim();
   const address = (reqData.address ?? '').toString().trim();
   const requestedCategory = (reqData.category ?? '').toString().trim().toLowerCase();
+  const requestedKeyword = (reqData.keyword ?? '').toString().trim().toLowerCase();
   const refresh = Boolean(reqData.refresh);
 
   if (!placeId) {
@@ -98,7 +100,9 @@ async function handle(reqData: {
   }
 
   const adminDb = getAdminDb();
-  const cacheDocId = encodeURIComponent(finalPlaceId);
+  const categoryKey = requestedCategory || 'default';
+  const keywordKey = requestedKeyword || 'none';
+  const cacheDocId = `${encodeURIComponent(finalPlaceId)}::${encodeURIComponent(categoryKey)}::${encodeURIComponent(keywordKey)}`;
 
   if (!refresh && adminDb) {
     try {
@@ -125,11 +129,24 @@ async function handle(reqData: {
 
     const category = requestedCategory || business.category;
 
-    const [tier1, tier2, tier3] = await Promise.all([
-      getNearbyCompetitors(business.location, milesToMetres(1), category, finalPlaceId),
-      getNearbyCompetitors(business.location, milesToMetres(3), category, finalPlaceId),
-      getNearbyCompetitors(business.location, milesToMetres(5), category, finalPlaceId),
-    ]);
+    // Pull a single broad 5-mile pool, then bucket locally by distance.
+    // This avoids per-tier API pagination caps causing flat 39/40/40 counts.
+    const tier3Pool = await getNearbyCompetitors(
+      business.location,
+      milesToMetres(5),
+      category,
+      finalPlaceId,
+      requestedKeyword,
+      4,
+    );
+
+    const tier1Max = milesToMetres(1);
+    const tier2Max = milesToMetres(3);
+    const tier3Max = milesToMetres(5);
+
+    const tier1 = tier3Pool.filter((p) => (p.distanceMetres ?? Number.MAX_SAFE_INTEGER) <= tier1Max);
+    const tier2 = tier3Pool.filter((p) => (p.distanceMetres ?? Number.MAX_SAFE_INTEGER) <= tier2Max);
+    const tier3 = tier3Pool.filter((p) => (p.distanceMetres ?? Number.MAX_SAFE_INTEGER) <= tier3Max);
 
     const stingCompetitor =
       pickStingCompetitor(tier1) ??
@@ -172,6 +189,8 @@ async function handle(reqData: {
       void adminDb.collection('competition_cache').doc(cacheDocId).set(
         {
           placeId: finalPlaceId,
+          category: categoryKey,
+          keyword: keywordKey,
           createdAt: new Date().toISOString(),
           payload,
         },
@@ -196,6 +215,7 @@ export async function GET(req: NextRequest) {
     name: searchParams.get('name') ?? undefined,
     address: searchParams.get('address') ?? undefined,
     category: searchParams.get('category') ?? undefined,
+    keyword: searchParams.get('keyword') ?? undefined,
     refresh: searchParams.get('refresh') === '1',
   });
 }
