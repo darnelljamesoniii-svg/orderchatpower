@@ -104,7 +104,7 @@ function TierCard({ tp, businessPlaceId, business, onLock, onPulseStop }: {
   onLock: (tp: TierPricing) => void;
   onPulseStop: () => void;
 }) {
-  const [payOpt, setPayOpt] = useState<'full' | 'afterpay' | 'bailout'>('full');
+  const [payOpt, setPayOpt] = useState<'full' | 'afterpay'>('full');
   const [loading, setLoading] = useState(false);
   const { color } = tp.tier;
 
@@ -138,7 +138,7 @@ function TierCard({ tp, businessPlaceId, business, onLock, onPulseStop }: {
         <ROIBadge roi={tp.roi} />
         <div className="space-y-1.5">
           <div className="text-gray-400 text-xs uppercase tracking-widest font-bold">Payment</div>
-          {tp.paymentOptions.map(o => (
+          {tp.paymentOptions.filter((o) => o.id !== 'bailout').map(o => (
             <button key={o.id} onClick={() => setPayOpt(o.id as typeof payOpt)}
               className={`w-full text-left px-3 py-2.5 rounded-xl border text-xs transition-all ${
                 payOpt === o.id ? 'border-white/30 bg-white/10 text-white' : 'border-gray-700 text-gray-400 hover:border-gray-500'
@@ -151,7 +151,6 @@ function TierCard({ tp, businessPlaceId, business, onLock, onPulseStop }: {
               <div className="font-mono font-bold mt-1">
                 {o.id === 'full' && `${currency(o.annualTotal)} today`}
                 {o.id === 'afterpay' && `4 × ${currency(o.monthly!)} · Total ${currency(o.annualTotal)}`}
-                {o.id === 'bailout' && `${currency(o.upfront)} today · then ${currency(o.monthly!)}/mo × 11`}
               </div>
             </button>
           ))}
