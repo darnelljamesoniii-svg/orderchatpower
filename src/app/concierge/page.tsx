@@ -24,15 +24,15 @@ const fmt = (n) => (typeof n === 'number' ? n.toLocaleString('en-US', { maximumF
 const currency = (n) => `$${fmt(n)}`;
 const stars = (r) => {
   const count = typeof r === 'number' ? Math.min(5, Math.max(0, Math.round(r))) : 0;
-  return 'â�o�?�'.repeat(count) + 'â�o�?�'.repeat(5 - count);
+  return 'Ã¢ï¿½oï¿½?ï¿½'.repeat(count) + 'Ã¢ï¿½oï¿½?ï¿½'.repeat(5 - count);
 };
 
 // --- Concierge Logic ---
 const MOOD_OPTIONS = {
-  morning: ['Coffee & Breakfast â�o�?�', 'Brunch ðŸ¥�?s', 'Bakery ðŸ¥', 'Quick Bite ðŸ¥ª'],
-  lunch:   ['Quick Bite ðŸ¥ª', 'Sit Down & Relax ðŸ½ï¸', 'Something Light ðŸ¥�?"', 'Comfort Food ðŸ�?�'],
-  dinner:  ['Comfort Food ðŸ�?�', 'Something Special â�"¨', 'Quick & Easy âš¡', 'Date Night ðŸ�'¹'],
-  late:    ['Late Night ðŸ�'�"�', 'Bar Food ðŸ»', 'Delivery ðŸ�?�µ', 'Quick Bite ðŸ¥ª'],
+  morning: ['Coffee and Breakfast', 'Brunch', 'Bakery', 'Quick Bite'],
+  lunch:   ['Quick Bite', 'Sit Down and Relax', 'Something Light', 'Comfort Food'],
+  dinner:  ['Comfort Food', 'Something Special', 'Quick and Easy', 'Date Night'],
+  late:    ['Late Night', 'Bar Food', 'Delivery', 'Quick Bite'],
 };
 
 function getTimeOfDay() {
@@ -127,8 +127,8 @@ const ConciergeDemo = ({ business }) => {
 
   useEffect(() => {
     if (step === 0 && business?.address) {
-      setTimeout(() => addBot(`Hi! ðŸ�?~�?� I'm the AI concierge for this area.`), 400);
-      setTimeout(() => addBot(`I've automatically pre-loaded your location at ${business.address.split(',')[0]} ðŸ�?o`), 1600);
+      setTimeout(() => addBot(`Hi! Ã°Å¸ï¿½?~ï¿½?ï¿½ I'm the AI concierge for this area.`), 400);
+      setTimeout(() => addBot(`I've automatically pre-loaded your location at ${business.address.split(',')[0]} Ã°Å¸ï¿½?oÂ`), 1600);
       setTimeout(() => {
         const tod = getTimeOfDay();
         addBot(`What are you in the mood for ${tod === 'dinner' ? 'tonight' : 'today'}?`, MOOD_OPTIONS[tod]);
@@ -139,16 +139,16 @@ const ConciergeDemo = ({ business }) => {
 
   const handleReply = (opt) => {
     addUser(opt);
-    setTimeout(() => addBot(`Looking for the best ${opt.split(' ')[0]} options in this area... ðŸ�?�`), 600);
+    setTimeout(() => addBot(`Looking for the best ${opt.split(' ')[0]} options in this area... Ã°Å¸ï¿½?ï¿½Â`), 600);
     setTimeout(() => addBot(`Found it! Based on live sentiment data, the top recommendation right now is actually one of your competitors.`), 2400);
-    setTimeout(() => addBot(`In the full version, we'd intercept this customer and route them directly to YOU instead. ðŸŽ¯`), 4200);
+    setTimeout(() => addBot(`In the full version, we'd intercept this customer and route them directly to YOU instead. Ã°Å¸Å½Â¯`), 4200);
   };
 
   return (
     <div className="bg-white rounded-[32px] h-[480px] flex flex-col shadow-2xl overflow-hidden border border-gray-100">
       <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/80 backdrop-blur-sm">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs">ðŸ½ï¸</div>
+          <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs">Ã°Å¸ÂÂ½Ã¯Â¸Â</div>
           <div>
             <div className="text-[10px] font-black text-gray-900 uppercase tracking-tighter leading-none">Local AI Concierge</div>
             <div className="text-[8px] text-emerald-500 font-bold flex items-center gap-1 mt-0.5"><span className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse" /> LIVE RADIUS SCAN</div>
@@ -179,9 +179,9 @@ const ConciergeDemo = ({ business }) => {
 };
 
 const TICKET_OPTIONS = [
-  { label: 'Fast Casual', range: '$12â�,��?o18', value: 15 },
-  { label: 'Casual Dining', range: '$22â�,��?o35', value: 28 },
-  { label: 'Polished Casual', range: '$35â�,��?o55', value: 45 },
+  { label: 'Fast Casual', range: '$12Ã¢ï¿½,ï¿½ï¿½?o18', value: 15 },
+  { label: 'Casual Dining', range: '$22Ã¢ï¿½,ï¿½ï¿½?o35', value: 28 },
+  { label: 'Polished Casual', range: '$35Ã¢ï¿½,ï¿½ï¿½?o55', value: 45 },
   { label: 'Fine Dining', range: '$65+', value: 75 },
 ];
 
@@ -355,9 +355,9 @@ const App = () => {
 
             <div className="space-y-4">
               <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-700">Proximity Vulnerability</h3>
-              <CompetitorList title="Tier 1 â�,��?� Hyper-Local" count={counts.tier1} items={competitors.tier1} color="#38bdf8" />
-              <CompetitorList title="Tier 2 â�,��?� High Drive" count={counts.tier2} items={competitors.tier2} color="#818cf8" />
-              <CompetitorList title="Tier 3 â�,��?� City Dominance" count={counts.tier3} items={competitors.tier3} color="#fbbf24" />
+              <CompetitorList title="Tier 1 Ã¢ï¿½,ï¿½ï¿½?ï¿½ Hyper-Local" count={counts.tier1} items={competitors.tier1} color="#38bdf8" />
+              <CompetitorList title="Tier 2 Ã¢ï¿½,ï¿½ï¿½?ï¿½ High Drive" count={counts.tier2} items={competitors.tier2} color="#818cf8" />
+              <CompetitorList title="Tier 3 Ã¢ï¿½,ï¿½ï¿½?ï¿½ City Dominance" count={counts.tier3} items={competitors.tier3} color="#fbbf24" />
             </div>
           </div>
 
@@ -392,7 +392,7 @@ const App = () => {
                        <div className="space-y-4 mb-10">
                          <div className="flex justify-between items-end border-b border-white/5 pb-4">
                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">ROI Multiple</span>
-                           <span className="text-2xl font-black text-white tracking-tighter">{tp.roi.roiMultiple}�f�?"</span>
+                           <span className="text-2xl font-black text-white tracking-tighter">{tp.roi.roiMultiple}ï¿½fï¿½?"</span>
                          </div>
                          <div className="flex justify-between items-end">
                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Yearly Rev</span>
@@ -405,7 +405,7 @@ const App = () => {
                              <div className="text-3xl font-black text-white tracking-tighter">{currency(tp.annualPrice)}</div>
                              <div className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-1">One-time Yearly Lock</div>
                           </div>
-                          <button className="w-full py-5 rounded-[20px] bg-white text-black font-black text-[11px] uppercase tracking-[0.3em] transition-all hover:bg-indigo-500 hover:text-white shadow-2xl">ðŸ�?��?T Lock Zone</button>
+                          <button className="w-full py-5 rounded-[20px] bg-white text-black font-black text-[11px] uppercase tracking-[0.3em] transition-all hover:bg-indigo-500 hover:text-white shadow-2xl">Ã°Å¸ï¿½?ï¿½ï¿½?T Lock Zone</button>
                        </div>
                     </div>
                   )) : (
