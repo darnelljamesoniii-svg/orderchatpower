@@ -181,7 +181,7 @@ export function getPaymentOptions(annualPrice: number): PaymentOption[] {
   const optB: PaymentOption = {
     id:          'afterpay',
     label:       'Afterpay',
-    description: 'Split into 4 interest-free payments. We receive funds upfront.',
+    description: 'Split into 4 interest-free payments.',
     annualTotal: annualPrice,
     upfront:     annualPrice / 4,
     monthly:     annualPrice / 4,

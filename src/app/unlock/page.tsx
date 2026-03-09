@@ -163,13 +163,13 @@ function TierCard({ tp, businessPlaceId, business, onLock, onPulseStop }: {
               className="w-full py-3 rounded-xl font-bold text-sm tracking-widest uppercase transition-all disabled:opacity-50"
               style={{ background: color, color: '#060810' }}
             >
-              {loading ? 'Processing...' : `Lock ${tp.tier.name}`}
+              {loading ? 'Processing...' : 'Continue to Checkout'}
             </button>
           ) : (
             <a href="tel:+18005550000"
               className="block w-full py-3 rounded-xl font-bold text-sm tracking-widest uppercase text-center border"
               style={{ borderColor: color, color }}>
-              Call to Lock This Zone
+              Call Sales Team
             </a>
           )}
         </div>
@@ -338,6 +338,7 @@ function UnlockPageContent() {
           description: `${tp.tier.name} - ${business.name} Zone Lock`,
           referenceId: placeId,
           buyerName:   business.name,
+          redirectUrl: `${window.location.origin}/sales/success`,
         }),
       });
       const payload = await sqRes.json();
