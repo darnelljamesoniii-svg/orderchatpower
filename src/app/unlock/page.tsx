@@ -186,6 +186,8 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
   onDone: () => void;
 }) {
   const [phase, setPhase] = useState<'search' | 'spinning' | 'result' | 'message'>('search');
+  const businessCategoryLabel =
+    (business.category || 'business').replace(/_/g, ' ').toLowerCase();
 
   useEffect(() => {
     const t1 = setTimeout(() => setPhase('spinning'), 1200);
@@ -200,12 +202,12 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
       <div className="text-center text-gray-400 text-xs uppercase tracking-widest font-bold">Live Recommendation Engine</div>
       <div className="bg-white rounded-full px-4 py-2.5 flex items-center gap-2 shadow">
         <span className="text-gray-400">🔍</span>
-        <span className="text-gray-600 text-sm">restaurants near me</span>
+        <span className="text-gray-600 text-sm">Recommendation request: best {businessCategoryLabel}</span>
         {phase === 'search' && <span className="ml-auto text-xs text-gray-400 animate-pulse">searching…</span>}
       </div>
       {phase === 'spinning' && (
         <div className="text-center space-y-2">
-          <div className="text-gray-400 text-xs">Evaluating nearby restaurants…</div>
+          <div className="text-gray-400 text-xs">Evaluating local recommendations…</div>
           <div className="flex justify-center gap-2 flex-wrap">
             {[business.name, competitor.name, 'Other Place', business.name].map((n, i) => (
               <div key={i} className="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400 animate-pulse"
@@ -216,7 +218,7 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
       )}
       {(phase === 'result' || phase === 'message') && (
         <div className="bg-white rounded-2xl p-4 shadow-lg">
-          <div className="text-xs text-gray-400 mb-2 font-medium">Top recommendation for this search:</div>
+          <div className="text-xs text-gray-400 mb-2 font-medium">Top recommendation returned:</div>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center text-2xl">🍕</div>
             <div>
@@ -518,3 +520,4 @@ export default function UnlockPage() {
     </Suspense>
   );
 }
+

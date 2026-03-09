@@ -56,6 +56,17 @@ export interface NearbyPlace {
   openNow?:      boolean;
 }
 
+interface NearbySearchResultItem {
+  place_id: string;
+  name: string;
+  geometry: { location: { lat: number; lng: number } };
+  types: string[];
+  rating?: number;
+  user_ratings_total?: number;
+  price_level?: number;
+  opening_hours?: { open_now: boolean };
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function photoUrl(ref: string, maxWidth = 800): string {
@@ -107,10 +118,31 @@ export function normaliseCategoryFromTypes(types: string[]): string {
     breakfast:        'breakfast',
     brunch:           'brunch',
   };
-  for (const t of types) {
-    const slug = t.toLowerCase().replace(/_restaurant$/, '');
+
+  const slugs = (types ?? []).map((t) => t.toLowerCase().replace(/_restaurant$/, ''));
+
+  // Prefer specific hospitality types over generic "restaurant"/"food".
+  const priority = [
+    'bar',
+    'night_club',
+    'cafe',
+    'bakery',
+    'meal_takeaway',
+    'meal_delivery',
+    'restaurant',
+    'food',
+  ];
+
+  for (const key of priority) {
+    if (slugs.includes(key) && map[key]) {
+      return map[key];
+    }
+  }
+
+  for (const slug of slugs) {
     if (map[slug]) return map[slug];
   }
+
   return 'restaurant';
 }
 
@@ -142,6 +174,47 @@ export function categoryToGoogleType(category: string): string {
     delivery:    'meal_delivery',
   };
   return map[category] ?? 'restaurant';
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchNearbyPages(urlBase: string): Promise<NearbySearchResultItem[]> {
+  const allResults: NearbySearchResultItem[] = [];
+  let nextPageToken = '';
+
+  // Google Nearby Search returns up to 20 per page; 2 pages gives better accuracy
+  // without adding too much latency for unlock rendering.
+  const MAX_PAGES = 2;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const pageUrl = nextPageToken
+      ? `${urlBase}&pagetoken=${encodeURIComponent(nextPageToken)}`
+      : urlBase;
+
+    if (nextPageToken) {
+      // Google requires a short delay before next_page_token becomes valid.
+      await sleep(1800);
+    }
+
+    const res = await fetch(pageUrl, { cache: 'no-store' });
+    const data = await res.json();
+
+    if (!['OK', 'ZERO_RESULTS'].includes(data.status)) {
+      // INVALID_REQUEST can happen if token is not ready yet; fail soft by stopping pagination.
+      if (data.status === 'INVALID_REQUEST' && nextPageToken) break;
+      throw new Error(`Places Nearby error: ${data.status}`);
+    }
+
+    const pageResults = (data.results ?? []) as NearbySearchResultItem[];
+    allResults.push(...pageResults);
+
+    nextPageToken = data.next_page_token ?? '';
+    if (!nextPageToken || pageResults.length === 0) break;
+  }
+
+  return allResults;
 }
 
 // ── API calls ─────────────────────────────────────────────────────────────────
@@ -218,26 +291,12 @@ export async function getNearbyCompetitors(
     key: KEY,
   });
 
-  const url  = `${BASE}/place/nearbysearch/json?${params}`;
-  const res  = await fetch(url, { next: { revalidate: 1800 } });
-  const data = await res.json();
+  const url = `${BASE}/place/nearbysearch/json?${params}`;
+  const results = await fetchNearbyPages(url);
 
-  if (!['OK', 'ZERO_RESULTS'].includes(data.status)) {
-    throw new Error(`Places Nearby error: ${data.status}`);
-  }
-
-  return (data.results ?? [])
-    .filter((p: { place_id: string }) => p.place_id !== excludePlaceId)
-    .map((p: {
-      place_id: string;
-      name: string;
-      geometry: { location: { lat: number; lng: number } };
-      types: string[];
-      rating?: number;
-      user_ratings_total?: number;
-      price_level?: number;
-      opening_hours?: { open_now: boolean };
-    }) => ({
+  return results
+    .filter((p) => p.place_id !== excludePlaceId)
+    .map((p) => ({
       placeId:       p.place_id,
       name:          p.name,
       location:      { lat: p.geometry.location.lat, lng: p.geometry.location.lng },

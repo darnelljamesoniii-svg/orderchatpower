@@ -52,6 +52,7 @@ export function useSignalWireDevice({
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const clientRef = useRef<any>(null);
   const callRef = useRef<any>(null);
+  const connectedFiredRef = useRef(false);
 
   const stopTimer = useCallback(() => {
     if (tickRef.current) {
@@ -67,9 +68,16 @@ export function useSignalWireDevice({
     }, 1000);
   }, [stopTimer]);
 
+  const fireConnectedOnce = useCallback(() => {
+    if (connectedFiredRef.current) return;
+    connectedFiredRef.current = true;
+    onCallConnected?.({ callSid: null, callLogId: null });
+  }, [onCallConnected]);
+
   const cleanupCall = useCallback(() => {
     stopTimer();
     callRef.current = null;
+    connectedFiredRef.current = false;
     setCallSid(null);
     setDuration(0);
     setState('idle');
@@ -88,13 +96,13 @@ export function useSignalWireDevice({
     });
 
     const tokenData = (await tokenRes.json()) as BrowserTokenResponse;
-    if (!tokenRes.ok || !tokenData?.project || !tokenData?.token) {
+    if (!tokenRes.ok || !tokenData?.token) {
       throw new Error(tokenData?.error ?? 'Unable to initialize browser calling token');
     }
 
     const mod = await import('@signalwire/js');
     const client = await mod.SignalWire({
-      project: tokenData.project,
+      ...(tokenData.project ? { project: tokenData.project } : {}),
       token: tokenData.token,
     } as any);
 
@@ -107,6 +115,7 @@ export function useSignalWireDevice({
       setError(null);
       setState('connecting');
       setDuration(0);
+      connectedFiredRef.current = false;
 
       const to = normalizeE164(toRaw);
       if (!to || !to.startsWith('+')) {
@@ -140,7 +149,7 @@ export function useSignalWireDevice({
         if (nextState.includes('answer') || nextState.includes('active') || nextState.includes('progress')) {
           setState('in-call');
           startTimer();
-          onCallConnected?.({ callSid: null, callLogId: null });
+          fireConnectedOnce();
           return;
         }
 
@@ -155,15 +164,18 @@ export function useSignalWireDevice({
         }
       });
 
+      call.once('room.subscribed', () => {
+        setState('in-call');
+        startTimer();
+        fireConnectedOnce();
+      });
+
       call.once('destroy', () => {
         cleanupCall();
       });
 
-      call.once('room.subscribed', () => {
-        setState('in-call');
-        startTimer();
-        onCallConnected?.({ callSid: null, callLogId: null });
-      });
+      // Start/answer media session. Without this, the dialed call object may never bridge audio.
+      await call.start();
 
       return { callSid: null, callLogId: null };
     } catch (err: any) {
@@ -173,7 +185,7 @@ export function useSignalWireDevice({
       onError?.(wrapped);
       return null;
     }
-  }, [cleanupCall, ensureClient, onCallConnected, onError, startTimer]);
+  }, [cleanupCall, ensureClient, fireConnectedOnce, onError, startTimer]);
 
   const hangUp = useCallback(async () => {
     setState('disconnecting');
@@ -227,6 +239,7 @@ export function useSignalWireDevice({
       // best effort
     }
     clientRef.current = null;
+    connectedFiredRef.current = false;
   }, [stopTimer]);
 
   return { state, error, callSid, duration, makeCall, hangUp, mute, reinit };
