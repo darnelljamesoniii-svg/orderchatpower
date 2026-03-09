@@ -139,7 +139,7 @@ const ConciergeDemo = ({ business }) => {
 
   const handleReply = (opt) => {
     addUser(opt);
-    setTimeout(() => addBot(`Looking for the best ${opt.split(' ')[0]} spots nearby... 🔍`), 600);
+    setTimeout(() => addBot(`Looking for the best ${opt.split(' ')[0]} options in this area... 🔍`), 600);
     setTimeout(() => addBot(`Found it! Based on live sentiment data, the top recommendation right now is actually one of your competitors.`), 2400);
     setTimeout(() => addBot(`In the full version, we'd intercept this customer and route them directly to YOU instead. 🎯`), 4200);
   };

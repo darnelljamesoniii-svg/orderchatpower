@@ -223,7 +223,7 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
             <div>
               <div className="font-bold text-gray-900">{competitor.name}</div>
               <div className="text-amber-400 text-xs">{stars(competitor.rating)} {competitor.rating?.toFixed(1)}</div>
-              <div className="text-gray-400 text-xs">{competitor.distanceMetres ? `${(competitor.distanceMetres / 1000).toFixed(1)}km away` : 'Nearby'}</div>
+              <div className="text-gray-400 text-xs">{competitor.distanceMetres ? `${(competitor.distanceMetres / 1000).toFixed(1)}km away` : 'In area'}</div>
             </div>
             <div className="ml-auto bg-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-full">✓ Recommended</div>
           </div>
@@ -238,11 +238,15 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
   );
 }
 
-function ConciergeDemoFrame() {
+function ConciergeDemoFrame({ placeId }: { placeId?: string }) {
+  const src = placeId
+    ? `/concierge?place_id=${encodeURIComponent(placeId)}`
+    : '/concierge';
+
   return (
     <div className="w-full h-[800px] rounded-2xl overflow-hidden border border-gray-800 shadow-2xl">
       <iframe
-        src="/concierge"
+        src={src}
         className="w-full h-full border-0"
         title="Concierge Demo"
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
@@ -428,7 +432,7 @@ function UnlockPageContent() {
                 onDone={() => { setStingDone(true); track.stingCompleted(); }}
               />
             ) : (
-              <ConciergeDemoFrame />
+              <ConciergeDemoFrame placeId={placeId} />
             )}
           </div>
 
@@ -519,4 +523,3 @@ export default function UnlockPage() {
     </Suspense>
   );
 }
-

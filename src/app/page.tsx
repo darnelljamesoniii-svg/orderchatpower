@@ -219,14 +219,14 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
       {/* Search bar simulation */}
       <div className="bg-white rounded-full px-4 py-2.5 flex items-center gap-2 shadow">
         <span className="text-gray-400">🔍</span>
-        <span className="text-gray-600 text-sm">restaurants near me</span>
+        <span className="text-gray-600 text-sm">Recommendation request: best local spot</span>
         {phase === 'search' && <span className="ml-auto text-xs text-gray-400 animate-pulse">searching…</span>}
       </div>
 
       {/* Spinning candidates */}
       {phase === 'spinning' && (
         <div className="text-center space-y-2">
-          <div className="text-gray-400 text-xs">Evaluating nearby restaurants…</div>
+          <div className="text-gray-400 text-xs">Evaluating local recommendations...</div>
           <div className="flex justify-center gap-2 flex-wrap">
             {[business.name, competitor.name, 'Other Place', business.name].map((n, i) => (
               <div key={i} className="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400 animate-pulse"
@@ -239,13 +239,13 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
       {/* Result — competitor wins */}
       {(phase === 'result' || phase === 'message') && (
         <div className="bg-white rounded-2xl p-4 shadow-lg">
-          <div className="text-xs text-gray-400 mb-2 font-medium">Top recommendation for this search:</div>
+          <div className="text-xs text-gray-400 mb-2 font-medium">Top recommendation returned:</div>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center text-2xl">🍕</div>
             <div>
               <div className="font-bold text-gray-900">{competitor.name}</div>
               <div className="text-amber-400 text-xs">{stars(competitor.rating)} {competitor.rating?.toFixed(1)}</div>
-              <div className="text-gray-400 text-xs">{competitor.distanceMetres ? `${(competitor.distanceMetres / 1000).toFixed(1)}km away` : 'Nearby'}</div>
+              <div className="text-gray-400 text-xs">{competitor.distanceMetres ? `${(competitor.distanceMetres / 1000).toFixed(1)}km away` : 'In area'}</div>
             </div>
             <div className="ml-auto bg-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-full">
               ✓ Recommended
@@ -265,11 +265,15 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
 }
 
 // ── Concierge Demo Iframe ─────────────────────────────────────────────────────
-function ConciergeDemoFrame() {
+function ConciergeDemoFrame({ placeId }: { placeId?: string }) {
+  const src = placeId
+    ? `/concierge?place_id=${encodeURIComponent(placeId)}`
+    : '/concierge';
+
   return (
     <div className="w-full h-[600px] lg:h-full rounded-2xl overflow-hidden border border-gray-800 shadow-2xl">
       <iframe
-        src="/concierge"
+        src={src}
         className="w-full h-full border-0"
         title="Concierge Demo"
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
@@ -470,7 +474,7 @@ function UnlockPageContent() {
                 onDone={() => { setStingDone(true); track.stingCompleted(); }}
               />
             ) : (
-              <ConciergeDemoFrame />
+              <ConciergeDemoFrame placeId={placeId} />
             )}
           </div>
 

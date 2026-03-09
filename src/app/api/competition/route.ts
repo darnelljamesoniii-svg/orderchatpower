@@ -69,6 +69,7 @@ async function handle(reqData: {
   place_id?: string;
   name?: string;
   address?: string;
+  category?: string;
   refresh?: boolean;
 }) {
   const apiKey = getApiKey();
@@ -79,6 +80,7 @@ async function handle(reqData: {
   const placeId = (reqData.placeId ?? reqData.place_id ?? '').toString().trim();
   const name = (reqData.name ?? '').toString().trim();
   const address = (reqData.address ?? '').toString().trim();
+  const requestedCategory = (reqData.category ?? '').toString().trim().toLowerCase();
   const refresh = Boolean(reqData.refresh);
 
   if (!placeId) {
@@ -121,10 +123,12 @@ async function handle(reqData: {
   try {
     const business = await getPlaceDetails(finalPlaceId);
 
+    const category = requestedCategory || business.category;
+
     const [tier1, tier2, tier3] = await Promise.all([
-      getNearbyCompetitors(business.location, milesToMetres(1), business.category, finalPlaceId),
-      getNearbyCompetitors(business.location, milesToMetres(3), business.category, finalPlaceId),
-      getNearbyCompetitors(business.location, milesToMetres(5), business.category, finalPlaceId),
+      getNearbyCompetitors(business.location, milesToMetres(1), category, finalPlaceId),
+      getNearbyCompetitors(business.location, milesToMetres(3), category, finalPlaceId),
+      getNearbyCompetitors(business.location, milesToMetres(5), category, finalPlaceId),
     ]);
 
     const stingCompetitor =
@@ -191,6 +195,7 @@ export async function GET(req: NextRequest) {
     placeId: searchParams.get('placeId') ?? undefined,
     name: searchParams.get('name') ?? undefined,
     address: searchParams.get('address') ?? undefined,
+    category: searchParams.get('category') ?? undefined,
     refresh: searchParams.get('refresh') === '1',
   });
 }
