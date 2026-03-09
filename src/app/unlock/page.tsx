@@ -433,13 +433,13 @@ function UnlockPageContent() {
           </div>
 
           <div className="flex-1 space-y-6">
-            {competitors && counts && (
-              <div>
-                <h2 className="font-bold text-white text-lg mb-3">Your Competitive Landscape</h2>
-                <div className="space-y-3">
-                  <CompetitorList title="Zone 1 — Local Lock"           count={counts.tier1} items={competitors.tier1} color="#00d4ff" onExpand={() => track.zoneExpanded("tier1")} />
-                  <CompetitorList title="Zone 2 — Neighborhood Control" count={counts.tier2} items={competitors.tier2} color="#8b5cf6" onExpand={() => track.zoneExpanded("tier2")} />
-                  <CompetitorList title="Zone 3 — Area Ownership"       count={counts.tier3} items={competitors.tier3} color="#f59e0b" onExpand={() => track.zoneExpanded("tier3")} />
+            {counts && (
+              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
+                <div className="text-gray-400 text-xs uppercase tracking-widest font-bold mb-2">Market Summary</div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                  <div className="bg-gray-800 rounded-lg px-3 py-2">1-mile zone: <span className="font-bold text-white">{counts.tier1}</span></div>
+                  <div className="bg-gray-800 rounded-lg px-3 py-2">3-mile zone: <span className="font-bold text-white">{counts.tier2}</span></div>
+                  <div className="bg-gray-800 rounded-lg px-3 py-2">5-mile zone: <span className="font-bold text-white">{counts.tier3}</span></div>
                 </div>
               </div>
             )}
