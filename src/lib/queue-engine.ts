@@ -119,35 +119,41 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
 
   const waveMap  = Object.fromEntries(activeCampaigns.map(c => [c.id, c]));
   const hasActiveCampaigns = activeCampaignIds.length > 0;
-  const newLeads = newSnap.docs
+  const allNewLeads = newSnap.docs
     .map(d => ({ id: d.id, ...d.data() } as Lead))
     .sort((a, b) => {
       const aTs = Date.parse((a.createdAt as string) ?? '');
       const bTs = Date.parse((b.createdAt as string) ?? '');
       return (Number.isFinite(aTs) ? aTs : Number.MAX_SAFE_INTEGER)
         - (Number.isFinite(bTs) ? bTs : Number.MAX_SAFE_INTEGER);
-    })
-    .filter((l) => {
-      const wave = waveMap[l.campaign];
-      if (wave) {
-        return isInCallingWindow(l, wave);
-      }
-
-      // If campaign is missing/unmapped, keep queue flowing with sane default window.
-      // Also used when there are no active campaigns configured.
-      if (!hasActiveCampaigns || !l.campaign || !waveMap[l.campaign]) {
-        return isInDefaultCallingWindow(l);
-      }
-
-      return false;
     });
+
+  const newLeads = allNewLeads.filter((l) => {
+    const wave = waveMap[l.campaign];
+    if (wave) {
+      return isInCallingWindow(l, wave);
+    }
+
+    // If campaign is missing/unmapped, keep queue flowing with sane default window.
+    // Also used when there are no active campaigns configured.
+    if (!hasActiveCampaigns || !l.campaign || !waveMap[l.campaign]) {
+      return isInDefaultCallingWindow(l);
+    }
+
+    return false;
+  });
+
+  // Emergency fallback: if queue has NEW leads but none are currently in-window,
+  // continue dialing oldest NEW leads rather than hard-stalling the agent.
+  const useWindowFallback = !ownedSnap.docs.length && !orphans.length && !autoSnap.docs.length && !newLeads.length && allNewLeads.length > 0;
+  const freshCandidates = useWindowFallback ? allNewLeads.slice(0, 10) : newLeads;
 
   // Build candidate list in priority order
   const candidates = [
     ...ownedSnap.docs,
     ...orphans,
     ...autoSnap.docs,
-    ...newLeads.map(l => ({ id: l.id, data: () => l, exists: true } as unknown as FirebaseFirestore.DocumentSnapshot)),
+    ...freshCandidates.map(l => ({ id: l.id, data: () => l, exists: true } as unknown as FirebaseFirestore.DocumentSnapshot)),
   ] as FirebaseFirestore.DocumentSnapshot[];
 
   if (!candidates.length) {
@@ -211,7 +217,11 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
   }
 
   const remaining = await leadsRef.where('status', 'in', ['NEW', 'CALLBACK_MANUAL', 'CALLBACK_AUTO']).count().get();
-  return { lead: lockedLead, queueDepth: remaining.data().count };
+  return {
+    lead: lockedLead,
+    queueDepth: remaining.data().count,
+    ...(useWindowFallback && lockedLead ? { message: 'No in-window leads. Dialing oldest NEW lead fallback.' } : {}),
+  };
 }
 
 export async function applyDisposition(
