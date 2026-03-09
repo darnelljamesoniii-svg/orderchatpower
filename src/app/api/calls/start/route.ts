@@ -38,6 +38,13 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json().catch(() => ({}));
+    const callMode = (process.env.SIGNALWIRE_CALL_MODE ?? 'webrtc').toLowerCase();
+    if (callMode === 'webrtc') {
+      return NextResponse.json(
+        { ok: false, error: 'Server PSTN dial path disabled. Use browser WebRTC calling.' },
+        { status: 410 }
+      );
+    }
     const { leadId, agentId } = body as { leadId?: string; agentId?: string };
 
     if (!leadId || !agentId) {
