@@ -6,9 +6,12 @@ import {
   type NearbyPlace,
 } from '@/lib/google-places';
 import { generateStingMessage } from '@/lib/gemini-concierge';
+import { getAdminDb } from '@/lib/firebase-admin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 function getApiKey() {
   return (
@@ -66,6 +69,7 @@ async function handle(reqData: {
   place_id?: string;
   name?: string;
   address?: string;
+  refresh?: boolean;
 }) {
   const apiKey = getApiKey();
   if (!apiKey) {
@@ -75,6 +79,7 @@ async function handle(reqData: {
   const placeId = (reqData.placeId ?? reqData.place_id ?? '').toString().trim();
   const name = (reqData.name ?? '').toString().trim();
   const address = (reqData.address ?? '').toString().trim();
+  const refresh = Boolean(reqData.refresh);
 
   if (!placeId) {
     return NextResponse.json({ ok: false, error: 'Missing place_id' }, { status: 400 });
@@ -88,6 +93,29 @@ async function handle(reqData: {
       { ok: false, error: 'Could not resolve place_id', details: e?.message ?? String(e) },
       { status: 400 }
     );
+  }
+
+  const adminDb = getAdminDb();
+  const cacheDocId = encodeURIComponent(finalPlaceId);
+
+  if (!refresh && adminDb) {
+    try {
+      const cacheSnap = await adminDb.collection('competition_cache').doc(cacheDocId).get();
+      if (cacheSnap.exists) {
+        const cached = cacheSnap.data() as any;
+        const createdAtMs = cached?.createdAt ? new Date(cached.createdAt).getTime() : 0;
+        const fresh = createdAtMs > 0 && Date.now() - createdAtMs < CACHE_TTL_MS;
+        if (fresh && cached?.payload) {
+          return NextResponse.json({
+            ...cached.payload,
+            cached: true,
+            cachedAt: cached.createdAt,
+          });
+        }
+      }
+    } catch {
+      // Cache should not block live data.
+    }
   }
 
   try {
@@ -117,7 +145,7 @@ async function handle(reqData: {
       }
     }
 
-    return NextResponse.json({
+    const payload = {
       ok: true,
       placeId: finalPlaceId,
       business,
@@ -133,7 +161,21 @@ async function handle(reqData: {
       },
       stingCompetitor,
       stingMessage,
-    });
+      cached: false,
+    };
+
+    if (adminDb) {
+      void adminDb.collection('competition_cache').doc(cacheDocId).set(
+        {
+          placeId: finalPlaceId,
+          createdAt: new Date().toISOString(),
+          payload,
+        },
+        { merge: true }
+      );
+    }
+
+    return NextResponse.json(payload);
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: e?.message ?? 'Failed to load competition data' },
@@ -149,6 +191,7 @@ export async function GET(req: NextRequest) {
     placeId: searchParams.get('placeId') ?? undefined,
     name: searchParams.get('name') ?? undefined,
     address: searchParams.get('address') ?? undefined,
+    refresh: searchParams.get('refresh') === '1',
   });
 }
 

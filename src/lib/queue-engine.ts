@@ -3,6 +3,7 @@ import { COLLECTIONS } from '@/lib/collections';
 import { FieldValue } from 'firebase-admin/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import type { Lead, CampaignWave, NextLeadResponse } from '@/types';
+import { buildDemoLink } from '@/lib/resend';
 
 const LOCK_DURATION_MS     = 60_000;
 const MAX_RETRIES          = 6;
@@ -13,8 +14,16 @@ function getLeadLocalHour(utcOffsetHours: number): number {
 }
 
 function isInCallingWindow(lead: Lead, wave: CampaignWave): boolean {
-  const h = getLeadLocalHour(lead.utcOffsetHours);
+  const offset = typeof lead.utcOffsetHours === 'number' ? lead.utcOffsetHours : -5;
+  const h = getLeadLocalHour(offset);
   return h >= wave.startHourLocal && h < wave.endHourLocal;
+}
+
+function isInDefaultCallingWindow(lead: Lead): boolean {
+  const offset = typeof lead.utcOffsetHours === 'number' ? lead.utcOffsetHours : -5;
+  const h = getLeadLocalHour(offset);
+  // Default business hours fallback when campaign linkage is missing.
+  return h >= 9 && h < 20;
 }
 
 async function isAgentOnline(adminDb: FirebaseFirestore.Firestore, agentId: string): Promise<boolean> {
@@ -47,12 +56,8 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
     ...(d.data() as Omit<CampaignWave, 'id'>),
   })) as CampaignWave[];
 
-  // If you truly want to block dialing when there are no campaigns, keep this.
-  // If you want the dialer to still run, remove this early return.
-  if (!activeCampaigns.length) {
-    const remaining = await leadsRef.where('status', 'in', ['NEW', 'CALLBACK_MANUAL', 'CALLBACK_AUTO']).count().get();
-    return { lead: null, queueDepth: remaining.data().count, message: 'No active campaigns.' };
-  }
+  // Do not hard-stop dialing when campaigns are misconfigured.
+  // We use a default local-hours window fallback below.
 
   // ── Priority 1: Agent-owned callbacks that are due ────────────────────────
   const ownedSnap = await leadsRef
@@ -93,28 +98,31 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
   // ── Priority 4: Fresh NEW leads ───────────────────────────────────────────
   const activeCampaignIds = activeCampaigns.map(c => c.id).filter(Boolean);
 
-  // CRITICAL FIX: "IN requires a non-empty ArrayValue"
-  let newSnap: FirebaseFirestore.QuerySnapshot;
-  if (activeCampaignIds.length > 0) {
-    newSnap = await leadsRef
-      .where('status', '==', 'NEW')
-      .where('campaign', 'in', activeCampaignIds)
-      .orderBy('createdAt', 'asc')
-      .limit(50)
-      .get();
-  } else {
-    // Fallback: still allow dialing NEW leads if campaigns exist but ids somehow missing
-    newSnap = await leadsRef
-      .where('status', '==', 'NEW')
-      .orderBy('createdAt', 'asc')
-      .limit(50)
-      .get();
-  }
+  // Query NEW leads broadly, then apply campaign-aware window filtering in memory.
+  const newSnap = await leadsRef
+    .where('status', '==', 'NEW')
+    .orderBy('createdAt', 'asc')
+    .limit(50)
+    .get();
 
   const waveMap  = Object.fromEntries(activeCampaigns.map(c => [c.id, c]));
+  const hasActiveCampaigns = activeCampaignIds.length > 0;
   const newLeads = newSnap.docs
     .map(d => ({ id: d.id, ...d.data() } as Lead))
-    .filter(l => waveMap[l.campaign] && isInCallingWindow(l, waveMap[l.campaign]));
+    .filter((l) => {
+      const wave = waveMap[l.campaign];
+      if (wave) {
+        return isInCallingWindow(l, wave);
+      }
+
+      // If campaign is missing/unmapped, keep queue flowing with sane default window.
+      // Also used when there are no active campaigns configured.
+      if (!hasActiveCampaigns || !l.campaign || !waveMap[l.campaign]) {
+        return isInDefaultCallingWindow(l);
+      }
+
+      return false;
+    });
 
   // Build candidate list in priority order
   const candidates = [
@@ -148,6 +156,14 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
 
         const lockExpiry = new Date(now.getTime() + LOCK_DURATION_MS).toISOString();
         const sessionId  = data.sessionId ?? uuidv4(); // generate if not already set
+        const lastUnlockUrl = buildDemoLink({
+          placeId: data.placeId,
+          kgmid: data.kgmid,
+          sessionId,
+          businessName: data.businessName,
+          address: data.address,
+          absolute: false,
+        });
 
         tx.update(docRef, {
           status:          'IN_PROGRESS',
@@ -155,6 +171,7 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
           lockedUntil:     lockExpiry,
           lastCalledAt:    nowIso,
           sessionId,
+          ...(lastUnlockUrl ? { lastUnlockUrl, lastUnlockSavedAt: nowIso } : {}),
           updatedAt:       nowIso,
         });
 
@@ -165,6 +182,7 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
           assignedAgentId: agentId,
           lockedUntil: lockExpiry,
           sessionId,
+          ...(lastUnlockUrl ? { lastUnlockUrl, lastUnlockSavedAt: nowIso } : {}),
         };
       });
 

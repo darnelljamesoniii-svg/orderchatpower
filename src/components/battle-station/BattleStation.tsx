@@ -162,13 +162,13 @@ export default function BattleStation({ agentId, agentName }: BattleStationProps
   const isOnCall = callState === 'in-call' || callState === 'ringing';
 
   const demoHref = currentLead
-    ? buildDemoLink({
-        placeId: currentLead.placeId ?? ((currentLead as any).place_id as string | undefined),
+    ? (currentLead.lastUnlockUrl?.trim() || buildDemoLink({
+        placeId: currentLead.placeId ?? ((currentLead as any).place_id as string | undefined),
         sessionId: currentLead.sessionId ?? '',
         businessName: currentLead.businessName ?? '',
         address: currentLead.address ?? '',
         absolute: false,
-      })
+      }))
     : '';
 
   return (

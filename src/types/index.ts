@@ -47,6 +47,8 @@ export interface Lead {
   closedAt?:         string;
   notes?:            string;
   address?:          string;
+  lastUnlockUrl?:    string;
+  lastUnlockSavedAt?: string;
   squarePaymentUrl?: string;
   createdAt:         string;
   updatedAt:         string;

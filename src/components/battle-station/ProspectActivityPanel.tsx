@@ -64,13 +64,13 @@ export default function ProspectActivityPanel({
   const [alerts,   setAlerts]   = useState<AgentAlert[]>([]);
 
   const demoPath = lead
-    ? buildDemoLink({
-        placeId: lead.placeId ?? ((lead as any).place_id as string | undefined),
+    ? (lead.lastUnlockUrl?.trim() || buildDemoLink({
+        placeId: lead.placeId ?? ((lead as any).place_id as string | undefined),
         sessionId: lead.sessionId ?? '',
         businessName: lead.businessName ?? '',
         address: lead.address ?? '',
         absolute: false,
-      })
+      }))
     : '';
 
   const demoLink = typeof window !== 'undefined' && demoPath
