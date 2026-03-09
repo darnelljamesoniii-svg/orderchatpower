@@ -92,7 +92,7 @@ function ROIBadge({ roi }: { roi: TierPricing['roi'] }) {
           <div className="text-gray-400 text-xs">to break even</div>
         </div>
       </div>
-      <div className="text-gray-500 text-[10px]">Based on {fmt(roi.monthlySearches)} monthly searches in zone - 3% conversion rate</div>
+      <div className="text-gray-500 text-[10px]">Based on 2 new orders/day per knocked-out competitor</div>
     </div>
   );
 }
@@ -340,11 +340,21 @@ function UnlockPageContent() {
           buyerName:   business.name,
         }),
       });
-      const { url } = await sqRes.json();
-      if (url) { window.open(url, '_blank'); track.paymentOpened(); setPulsesStopped(true); }
-      setLockSuccess(true);
-    } catch {
-      alert('Something went wrong. Please try again or call us.');
+      const payload = await sqRes.json();
+      if (!sqRes.ok) {
+        throw new Error(payload?.error || 'Unable to start checkout.');
+      }
+      const { url } = payload;
+      if (!url) {
+        throw new Error('Checkout link was not returned.');
+      }
+
+      track.paymentOpened();
+      setPulsesStopped(true);
+      window.location.assign(url);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Something went wrong. Please try again or call us.';
+      alert(message);
     } finally {
       setLocking(false);
     }

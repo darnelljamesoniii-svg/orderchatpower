@@ -99,9 +99,9 @@ export const TIERS: PricingTier[] = [
 // â�?��,�â�?��,� Monthly search volume estimates by tier â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�
 // Conservative, based on Google local search density data
 const MONTHLY_SEARCHES: Record<string, number> = {
-  tier1: 320,
-  tier2: 780,
-  tier3: 1800,
+  tier1: 900,
+  tier2: 2200,
+  tier3: 5200,
 };
 
 // â�?��,�â�?��,� Density multiplier â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�
@@ -135,19 +135,15 @@ export function calcROI(
 ): ROIResult {
   const monthlySearches   = MONTHLY_SEARCHES[tierId];
   const currentCapturePct = 1 / (competitorCount + 1);
-  const lockedCapturePct  = 1.0;
+  const lockedCapturePctByTier: Record<typeof tierId, number> = { tier1: 0.62, tier2: 0.70, tier3: 0.78 };
+  const lockedCapturePct  = lockedCapturePctByTier[tierId];
 
-  // 3% of searches â�?��?T new customers (high-intent local search)
-  const conversionRate     = 0.03;
-  const currentCustomersMo = monthlySearches * currentCapturePct * conversionRate;
-  const lockedCustomersMo  = monthlySearches * lockedCapturePct  * conversionRate;
-  const newCustomersMo     = lockedCustomersMo - currentCustomersMo;
-
-  const newCustomersPerYear = Math.round(newCustomersMo * 12);
-  const newCustomersPerDay  = newCustomersMo / 30;
+  // Sales model: ~2 additional orders/day per knocked-out competitor.
+  const newCustomersPerDay  = competitorCount * 2;
+  const newCustomersPerYear = Math.round(newCustomersPerDay * 365);
 
   // Average visit frequency: 2.5�f�?" per year for a regular customer
-  const visitFrequency    = 2.5;
+  const visitFrequency    = 3.0;
   const newRevenuePerYear = Math.round(newCustomersPerYear * avgTicket * visitFrequency);
   const roiMultiple       = Math.round((newRevenuePerYear / annualPrice) * 10) / 10;
   const paybackDays       = Math.round(annualPrice / (newRevenuePerYear / 365));
@@ -155,7 +151,7 @@ export function calcROI(
   return {
     monthlySearches,
     currentCapturePct:   Math.round(currentCapturePct * 100),
-    lockedCapturePct:    100,
+    lockedCapturePct:    Math.round(lockedCapturePct * 100),
     newCustomersPerDay:  Math.round(newCustomersPerDay * 10) / 10,
     newCustomersPerYear,
     newRevenuePerYear,
@@ -237,7 +233,7 @@ export function calcTierPricing(
       monthlyEquiv:   monthly,
       paymentOptions: options,
       roi,
-      autoCheckout:   !density.flagManual,
+      autoCheckout:   true,
     };
   });
 }
