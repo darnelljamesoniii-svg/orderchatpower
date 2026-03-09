@@ -64,6 +64,74 @@ function pickStingCompetitor(candidates: NearbyPlace[]): NearbyPlace | null {
   })[0] ?? null;
 }
 
+function dedupeByPlaceId(items: NearbyPlace[]): NearbyPlace[] {
+  const map = new Map<string, NearbyPlace>();
+  for (const item of items) {
+    const existing = map.get(item.placeId);
+    if (!existing) {
+      map.set(item.placeId, item);
+      continue;
+    }
+
+    const existingDist = existing.distanceMetres ?? Number.MAX_SAFE_INTEGER;
+    const nextDist = item.distanceMetres ?? Number.MAX_SAFE_INTEGER;
+    if (nextDist < existingDist) {
+      map.set(item.placeId, item);
+    }
+  }
+
+  return [...map.values()].sort(
+    (a, b) => (a.distanceMetres ?? Number.MAX_SAFE_INTEGER) - (b.distanceMetres ?? Number.MAX_SAFE_INTEGER),
+  );
+}
+
+function inferCuisineKeyword(input: {
+  name?: string;
+  category?: string;
+  googleTypes?: string[];
+  requestedCategory?: string;
+  requestedKeyword?: string;
+}): string {
+  const requestedKeyword = (input.requestedKeyword ?? '').trim().toLowerCase();
+  if (requestedKeyword) return requestedKeyword;
+
+  const requestedCategory = (input.requestedCategory ?? '').trim().toLowerCase();
+  if (requestedCategory && requestedCategory !== 'restaurant') return requestedCategory;
+
+  const category = (input.category ?? '').trim().toLowerCase();
+  if (category && category !== 'restaurant') return category;
+
+  const name = (input.name ?? '').toLowerCase();
+  const types = (input.googleTypes ?? []).map((t) => t.toLowerCase());
+  const haystack = `${name} ${types.join(' ')}`;
+
+  const hints = [
+    'pizza',
+    'sushi',
+    'mexican',
+    'italian',
+    'chinese',
+    'thai',
+    'indian',
+    'bbq',
+    'burger',
+    'steak',
+    'seafood',
+    'taco',
+    'ramen',
+    'wings',
+    'coffee',
+    'bakery',
+    'bar',
+  ];
+
+  for (const hint of hints) {
+    if (haystack.includes(hint)) return hint;
+  }
+
+  return '';
+}
+
 async function handle(reqData: {
   placeId?: string;
   place_id?: string;
@@ -128,6 +196,13 @@ async function handle(reqData: {
     const business = await getPlaceDetails(finalPlaceId);
 
     const category = requestedCategory || business.category;
+    const keywordForSearch = inferCuisineKeyword({
+      name: business.name,
+      category: business.category,
+      googleTypes: business.googleTypes,
+      requestedCategory,
+      requestedKeyword,
+    });
 
     // Pull a single broad 5-mile pool, then bucket locally by distance.
     // This avoids per-tier API pagination caps causing flat 39/40/40 counts.
@@ -136,7 +211,7 @@ async function handle(reqData: {
       milesToMetres(5),
       category,
       finalPlaceId,
-      requestedKeyword,
+      keywordForSearch || undefined,
       4,
     );
 
@@ -144,9 +219,14 @@ async function handle(reqData: {
     const tier2Max = milesToMetres(3);
     const tier3Max = milesToMetres(5);
 
-    const tier1 = tier3Pool.filter((p) => (p.distanceMetres ?? Number.MAX_SAFE_INTEGER) <= tier1Max);
-    const tier2 = tier3Pool.filter((p) => (p.distanceMetres ?? Number.MAX_SAFE_INTEGER) <= tier2Max);
-    const tier3 = tier3Pool.filter((p) => (p.distanceMetres ?? Number.MAX_SAFE_INTEGER) <= tier3Max);
+    const pool = dedupeByPlaceId(tier3Pool);
+
+    // Cumulative zones:
+    // tier1: up to 1 mile, tier2: up to 3 miles (includes tier1),
+    // tier3: up to 5 miles (includes tier1 + tier2).
+    const tier1 = pool.filter((p) => (p.distanceMetres ?? Number.MAX_SAFE_INTEGER) <= tier1Max);
+    const tier2 = pool.filter((p) => (p.distanceMetres ?? Number.MAX_SAFE_INTEGER) <= tier2Max);
+    const tier3 = pool.filter((p) => (p.distanceMetres ?? Number.MAX_SAFE_INTEGER) <= tier3Max);
 
     const stingCompetitor =
       pickStingCompetitor(tier1) ??
@@ -180,6 +260,7 @@ async function handle(reqData: {
         tier2: tier2.length,
         tier3: tier3.length,
       },
+      searchKeywordUsed: keywordForSearch || null,
       stingCompetitor,
       stingMessage,
       cached: false,

@@ -32,6 +32,7 @@ function makeSessionId(): string {
 
 export default function LinkBuilderPage() {
   const [baseUrl, setBaseUrl] = useState('https://orderchatpower.vercel.app');
+  const [campaignKeyword, setCampaignKeyword] = useState('');
   const [includeRefresh, setIncludeRefresh] = useState(true);
   const [rows, setRows] = useState<OutRow[]>([]);
   const [message, setMessage] = useState('');
@@ -60,7 +61,8 @@ export default function LinkBuilderPage() {
       const givenPlaceId = pick(row, PLACE_KEYS);
       const placeId = givenPlaceId || (businessName && address ? '/g/lookup' : '');
       const sessionId = pick(row, SESSION_KEYS) || makeSessionId();
-      const keyword = pick(row, KEYWORD_KEYS);
+      const keywordFromCsv = pick(row, KEYWORD_KEYS);
+      const keyword = campaignKeyword.trim() || keywordFromCsv;
 
       if (!placeId) {
         return {
@@ -119,6 +121,14 @@ export default function LinkBuilderPage() {
             placeholder="https://orderchatpower.vercel.app"
           />
 
+          <label className="block text-sm text-gray-300">Campaign Keyword (Optional)</label>
+          <input
+            value={campaignKeyword}
+            onChange={(e) => setCampaignKeyword(e.target.value)}
+            className="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+            placeholder="pizza"
+          />
+
           <label className="inline-flex items-center gap-2 text-sm text-gray-300">
             <input
               type="checkbox"
@@ -140,6 +150,9 @@ export default function LinkBuilderPage() {
 
           <div className="text-xs text-gray-400">
             Accepted columns: <code>place_id/placeId/Place_ID/kgmid</code>, <code>businessName/name</code>, <code>address/Full_Address</code>, optional <code>keyword</code>, optional <code>sessionId</code>.
+          </div>
+          <div className="text-xs text-gray-500">
+            If Campaign Keyword is set, it is used for every row.
           </div>
         </div>
 

@@ -9,7 +9,7 @@ import { initSession, initReturnVisitDetection, track } from '@/lib/session-trac
 
 function fmt(n: number) { return n.toLocaleString('en-US', { maximumFractionDigits: 0 }); }
 function currency(n: number) { return `$${fmt(n)}`; }
-function stars(r?: number) { if (!r) return ''; return '★'.repeat(Math.round(r)) + '☆'.repeat(5 - Math.round(r)); }
+function stars(r?: number) { if (!r) return ''; return '*'.repeat(Math.round(r)) + '-'.repeat(5 - Math.round(r)); }
 
 function PhotoCarousel({ photos }: { photos: { url: string }[] }) {
   const [idx, setIdx] = useState(0);
@@ -43,7 +43,7 @@ function CompetitorList({ title, count, items, color, onExpand }: {
         </div>
         <div className="flex items-center gap-3">
           <span className="font-mono font-bold text-sm" style={{ color }}>{count} competitors</span>
-          <span className="text-gray-400 text-xs">{open ? '▲' : '▼'}</span>
+          <span className="text-gray-400 text-xs">{open ? 'open' : 'closed'}</span>
         </div>
       </button>
       {open && (
@@ -76,7 +76,7 @@ function ROIBadge({ roi }: { roi: TierPricing['roi'] }) {
       <div className="text-emerald-400 font-bold text-xs uppercase tracking-widest">ROI Projection</div>
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <div className="text-white font-bold text-xl">{roi.roiMultiple}×</div>
+          <div className="text-white font-bold text-xl">{roi.roiMultiple}x</div>
           <div className="text-gray-400 text-xs">return</div>
         </div>
         <div>
@@ -92,7 +92,7 @@ function ROIBadge({ roi }: { roi: TierPricing['roi'] }) {
           <div className="text-gray-400 text-xs">to break even</div>
         </div>
       </div>
-      <div className="text-gray-500 text-[10px]">Based on {fmt(roi.monthlySearches)} monthly searches in zone · 3% conversion rate</div>
+      <div className="text-gray-500 text-[10px]">Based on {fmt(roi.monthlySearches)} monthly searches in zone - 3% conversion rate</div>
     </div>
   );
 }
@@ -122,14 +122,14 @@ function TierCard({ tp, businessPlaceId, business, onLock, onPulseStop }: {
           </div>
         </div>
         <div className="flex gap-3 mt-2 text-xs text-gray-400">
-          <span>🚶 {tp.tier.walkMinutes}-min walk</span>
-          <span>🚗 {tp.tier.driveMiles}-mile drive</span>
+          <span>{tp.tier.walkMinutes}-min walk</span>
+          <span>{tp.tier.driveMiles}-mile drive</span>
         </div>
       </div>
 
       <div className="p-4 flex flex-col gap-3 flex-1">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs" style={{ background: color + '20', color }}>✕</div>
+          <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs" style={{ background: color + '20', color }}>X</div>
           <span className="text-white text-sm font-medium">Knocks out {tp.competitorCount} competitors</span>
         </div>
         <div className="text-xs px-2 py-1 rounded-full w-fit" style={{ background: color + '15', color }}>
@@ -150,7 +150,7 @@ function TierCard({ tp, businessPlaceId, business, onLock, onPulseStop }: {
               <div className="text-gray-500 mt-0.5">{o.description}</div>
               <div className="font-mono font-bold mt-1">
                 {o.id === 'full' && `${currency(o.annualTotal)} today`}
-                {o.id === 'afterpay' && `4 × ${currency(o.monthly!)} · Total ${currency(o.annualTotal)}`}
+                {o.id === 'afterpay' && `4 x ${currency(o.monthly!)} - Total ${currency(o.annualTotal)}`}
               </div>
             </button>
           ))}
@@ -163,13 +163,13 @@ function TierCard({ tp, businessPlaceId, business, onLock, onPulseStop }: {
               className="w-full py-3 rounded-xl font-bold text-sm tracking-widest uppercase transition-all disabled:opacity-50"
               style={{ background: color, color: '#060810' }}
             >
-              {loading ? 'Processing…' : `🔒 Lock ${tp.tier.name}`}
+              {loading ? 'Processing...' : `Lock ${tp.tier.name}`}
             </button>
           ) : (
             <a href="tel:+18005550000"
               className="block w-full py-3 rounded-xl font-bold text-sm tracking-widest uppercase text-center border"
               style={{ borderColor: color, color }}>
-              📞 Call to Lock This Zone
+              Call to Lock This Zone
             </a>
           )}
         </div>
@@ -200,13 +200,13 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
     <div className="bg-gray-900 border border-gray-700 rounded-2xl p-5 space-y-4">
       <div className="text-center text-gray-400 text-xs uppercase tracking-widest font-bold">Live Recommendation Engine</div>
       <div className="bg-white rounded-full px-4 py-2.5 flex items-center gap-2 shadow">
-        <span className="text-gray-400">🔍</span>
+        <span className="text-gray-400">Search</span>
         <span className="text-gray-600 text-sm">Recommendation request: best {businessCategoryLabel}</span>
-        {phase === 'search' && <span className="ml-auto text-xs text-gray-400 animate-pulse">searching…</span>}
+        {phase === 'search' && <span className="ml-auto text-xs text-gray-400 animate-pulse">searching...</span>}
       </div>
       {phase === 'spinning' && (
         <div className="text-center space-y-2">
-          <div className="text-gray-400 text-xs">Evaluating local recommendations…</div>
+          <div className="text-gray-400 text-xs">Evaluating local recommendations...</div>
           <div className="flex justify-center gap-2 flex-wrap">
             {[business.name, competitor.name, 'Other Place', business.name].map((n, i) => (
               <div key={i} className="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400 animate-pulse"
@@ -219,13 +219,13 @@ function StingAnimation({ competitor, business, stingMessage, onDone }: {
         <div className="bg-white rounded-2xl p-4 shadow-lg">
           <div className="text-xs text-gray-400 mb-2 font-medium">Top recommendation returned:</div>
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center text-2xl">🍕</div>
+            <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center text-2xl">Top</div>
             <div>
               <div className="font-bold text-gray-900">{competitor.name}</div>
               <div className="text-amber-400 text-xs">{stars(competitor.rating)} {competitor.rating?.toFixed(1)}</div>
               <div className="text-gray-400 text-xs">{competitor.distanceMetres ? `${(competitor.distanceMetres / 1000).toFixed(1)}km away` : 'In area'}</div>
             </div>
-            <div className="ml-auto bg-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-full">✓ Recommended</div>
+            <div className="ml-auto bg-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-full">Recommended</div>
           </div>
         </div>
       )}
@@ -256,9 +256,9 @@ function ConciergeDemoFrame({ placeId, keyword }: { placeId?: string; keyword?: 
 }
 
 const TICKET_OPTIONS = [
-  { label: 'Fast Casual',     range: '$12–18', value: 15 },
-  { label: 'Casual Dining',   range: '$22–35', value: 28 },
-  { label: 'Polished Casual', range: '$35–55', value: 45 },
+  { label: 'Fast Casual',     range: '$12-18', value: 15 },
+  { label: 'Casual Dining',   range: '$22-35', value: 28 },
+  { label: 'Polished Casual', range: '$35-55', value: 45 },
   { label: 'Fine Dining',     range: '$65+',   value: 75 },
 ];
 
@@ -316,7 +316,7 @@ function UnlockPageContent() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        competitorCounts: { tier1: counts.tier1, tier2: counts.tier2 - counts.tier1, tier3: counts.tier3 - counts.tier2 },
+        competitorCounts: { tier1: counts.tier1, tier2: counts.tier2, tier3: counts.tier3 },
         avgTicket,
       }),
     })
@@ -335,7 +335,7 @@ function UnlockPageContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amountCents: tp.annualPrice * 100,
-          description: `${tp.tier.name} — ${business.name} Zone Lock`,
+          description: `${tp.tier.name} - ${business.name} Zone Lock`,
           referenceId: placeId,
           buyerName:   business.name,
         }),
@@ -354,7 +354,7 @@ function UnlockPageContent() {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white p-8 text-center">
         <div>
-          <div className="text-5xl mb-4">🔗</div>
+          <div className="text-5xl mb-4">Link</div>
           <h1 className="text-2xl font-bold mb-2">Invalid Link</h1>
           <p className="text-gray-400">This link requires a business ID. Please use the link sent to you by your AgenticLife representative.</p>
         </div>
@@ -367,7 +367,7 @@ function UnlockPageContent() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="text-center space-y-3">
           <div className="w-12 h-12 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-gray-400 text-sm">Analysing your competitive landscape…</p>
+          <p className="text-gray-400 text-sm">Analysing your competitive landscape...</p>
         </div>
       </div>
     );
@@ -377,7 +377,7 @@ function UnlockPageContent() {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white p-8 text-center">
         <div>
-          <div className="text-5xl mb-4">⚠️</div>
+          <div className="text-5xl mb-4">Error</div>
           <p className="text-gray-400">{error || 'Business not found.'}</p>
         </div>
       </div>
@@ -387,7 +387,7 @@ function UnlockPageContent() {
   if (lockSuccess && lockedTier) {
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-8 text-center space-y-6">
-        <div className="text-6xl animate-bounce">🔒</div>
+        <div className="text-6xl animate-bounce">Locked</div>
         <h1 className="text-3xl font-bold text-white">Zone Locked!</h1>
         <p className="text-gray-300 max-w-sm">
           <strong>{business.name}</strong> is now the exclusive {business.category} recommendation in your {lockedTier.tier.name} zone.
@@ -396,9 +396,9 @@ function UnlockPageContent() {
         <div className="bg-emerald-900/30 border border-emerald-500/30 rounded-2xl p-4 max-w-sm w-full">
           <div className="text-emerald-400 font-bold text-sm uppercase tracking-widest mb-2">Your Zone</div>
           <div className="text-white text-sm space-y-1">
-            <div>📍 {lockedTier.tier.walkMinutes}-min walk · {lockedTier.tier.driveMiles}-mile drive</div>
-            <div>✕ {lockedTier.competitorCount} competitors locked out</div>
-            <div>💰 {currency(lockedTier.annualPrice)}/year · renews in 12 months</div>
+            <div>{lockedTier.tier.walkMinutes}-min walk - {lockedTier.tier.driveMiles}-mile drive</div>
+            <div>X {lockedTier.competitorCount} competitors locked out</div>
+            <div>{currency(lockedTier.annualPrice)}/year - renews in 12 months</div>
           </div>
         </div>
         <p className="text-gray-500 text-sm">A confirmation has been sent to your email. Your representative will be in touch shortly.</p>
@@ -412,7 +412,7 @@ function UnlockPageContent() {
         <ActivityPulse business={business} competitors={competitors} stopped={pulsesStopped} />
       )}
       <div className="bg-gradient-to-b from-gray-900 to-gray-950 border-b border-gray-800 px-4 py-6 text-center">
-        <div className="text-xs uppercase tracking-widest text-indigo-400 font-bold mb-1">AgenticLife · Exclusive Territory</div>
+        <div className="text-xs uppercase tracking-widest text-indigo-400 font-bold mb-1">AgenticLife - Exclusive Territory</div>
         <h1 className="text-2xl md:text-3xl font-bold text-white mb-1">{business.name}</h1>
         <p className="text-gray-400 text-sm">{business.address}</p>
       </div>
@@ -423,7 +423,7 @@ function UnlockPageContent() {
           <div className="w-full lg:w-[420px] lg:sticky lg:top-4 lg:self-start flex-shrink-0">
             <div className="mb-3">
               <h2 className="font-bold text-white text-lg">See What Your Customers See</h2>
-              <p className="text-gray-400 text-sm mt-0.5">This is the concierge experience your customers use right now — watch who gets recommended.</p>
+              <p className="text-gray-400 text-sm mt-0.5">This is the concierge experience your customers use right now - watch who gets recommended.</p>
             </div>
             {stingComp && !stingDone ? (
               <StingAnimation
