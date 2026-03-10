@@ -5,9 +5,15 @@ function normalizeSquareBaseUrl(raw?: string): string {
   return base.endsWith('/v2') ? base.slice(0, -3) : base;
 }
 
+function normalizeSquareToken(raw?: string): string {
+  const token = (raw || '').trim().replace(/^['"]|['"]$/g, '');
+  // Allow either raw token or "Bearer <token>" in env.
+  return token.replace(/^Bearer\s+/i, '');
+}
+
 const SQUARE_BASE_URL = normalizeSquareBaseUrl(process.env.SQUARE_BASE_URL);
-const SQUARE_TOKEN = process.env.SQUARE_ACCESS_TOKEN!;
-const SQUARE_LOCATION = process.env.SQUARE_LOCATION_ID!;
+const SQUARE_TOKEN = normalizeSquareToken(process.env.SQUARE_ACCESS_TOKEN);
+const SQUARE_LOCATION = (process.env.SQUARE_LOCATION_ID || '').trim();
 const SQUARE_VERSION = '2024-07-17';
 
 export interface CreatePaymentLinkParams {
@@ -119,6 +125,13 @@ async function createWithLocation(locationId: string, params: CreatePaymentLinkP
  * Create a Square checkout / payment link and return the URL.
  */
 export async function createSquarePaymentLink(params: CreatePaymentLinkParams): Promise<PaymentLinkResult> {
+  if (!SQUARE_TOKEN) {
+    throw new Error('Square is not configured: missing SQUARE_ACCESS_TOKEN');
+  }
+  if (!SQUARE_LOCATION) {
+    throw new Error('Square is not configured: missing SQUARE_LOCATION_ID');
+  }
+
   const preferredLocationId = SQUARE_LOCATION;
 
   try {
