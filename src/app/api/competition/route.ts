@@ -1,107 +1,307 @@
-/**
- * Helper to resolve Google Feature IDs (/g/...) to standard Place IDs (ChIJ...)
- * Google Details API crashes if you pass it a /g/ ID directly.
- */
-async function resolvePlaceId(id, apiKey) {
-  // If it's already a standard Place ID, return it
-  if (!id.startsWith('/g/')) {
-    return id;
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  getPlaceDetails,
+  getNearbyCompetitors,
+  milesToMetres,
+  type NearbyPlace,
+} from '@/lib/google-places';
+import { generateStingMessage } from '@/lib/gemini-concierge';
+import { getAdminDb } from '@/lib/firebase-admin';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+function getApiKey() {
+  return (
+    process.env.GOOGLE_MAPS_API_KEY?.trim() ||
+    process.env.GOOGLE_PLACES_API_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ||
+    ''
+  );
+}
+
+async function resolvePlaceId(args: {
+  placeId: string;
+  name?: string;
+  address?: string;
+  apiKey: string;
+}): Promise<string> {
+  const { placeId, name, address, apiKey } = args;
+
+  if (!placeId) throw new Error('Missing placeId');
+  if (!placeId.startsWith('/g/')) return placeId;
+
+  const query = [name, address].filter(Boolean).join(' ').trim();
+  if (!query) {
+    throw new Error('Cannot resolve /g/ id without name/address');
   }
 
-  console.log(`Attempting to resolve Feature ID: ${id}`);
+  const url =
+    `https://maps.googleapis.com/maps/api/place/findplacefromtext/json` +
+    `?input=${encodeURIComponent(query)}` +
+    `&inputtype=textquery` +
+    `&fields=place_id,name` +
+    `&key=${encodeURIComponent(apiKey)}`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (data?.status !== 'OK' || !data?.candidates?.length) {
+    throw new Error(`findplacefromtext failed: ${data?.status ?? 'UNKNOWN'}`);
+  }
+
+  return data.candidates[0].place_id;
+}
+
+function pickStingCompetitor(candidates: NearbyPlace[]): NearbyPlace | null {
+  if (!candidates.length) return null;
+  return [...candidates].sort((a, b) => {
+    const ratingDiff = (b.rating ?? 0) - (a.rating ?? 0);
+    if (ratingDiff !== 0) return ratingDiff;
+    return (a.distanceMetres ?? Number.MAX_SAFE_INTEGER) - (b.distanceMetres ?? Number.MAX_SAFE_INTEGER);
+  })[0] ?? null;
+}
+
+function dedupeByPlaceId(items: NearbyPlace[]): NearbyPlace[] {
+  const map = new Map<string, NearbyPlace>();
+  for (const item of items) {
+    const existing = map.get(item.placeId);
+    if (!existing) {
+      map.set(item.placeId, item);
+      continue;
+    }
+
+    const existingDist = existing.distanceMetres ?? Number.MAX_SAFE_INTEGER;
+    const nextDist = item.distanceMetres ?? Number.MAX_SAFE_INTEGER;
+    if (nextDist < existingDist) {
+      map.set(item.placeId, item);
+    }
+  }
+
+  return [...map.values()].sort(
+    (a, b) => (a.distanceMetres ?? Number.MAX_SAFE_INTEGER) - (b.distanceMetres ?? Number.MAX_SAFE_INTEGER),
+  );
+}
+
+function inferCuisineKeyword(input: {
+  name?: string;
+  category?: string;
+  googleTypes?: string[];
+  requestedCategory?: string;
+  requestedKeyword?: string;
+}): string {
+  const requestedKeyword = (input.requestedKeyword ?? '').trim().toLowerCase();
+  if (requestedKeyword) return requestedKeyword;
+
+  const requestedCategory = (input.requestedCategory ?? '').trim().toLowerCase();
+  if (requestedCategory && requestedCategory !== 'restaurant') return requestedCategory;
+
+  const category = (input.category ?? '').trim().toLowerCase();
+  if (category && category !== 'restaurant') return category;
+
+  const name = (input.name ?? '').toLowerCase();
+  const types = (input.googleTypes ?? []).map((t) => t.toLowerCase());
+  const haystack = `${name} ${types.join(' ')}`;
+
+  const hints = [
+    'pizza',
+    'sushi',
+    'mexican',
+    'italian',
+    'chinese',
+    'thai',
+    'indian',
+    'bbq',
+    'burger',
+    'steak',
+    'seafood',
+    'taco',
+    'ramen',
+    'wings',
+    'coffee',
+    'bakery',
+    'bar',
+  ];
+
+  for (const hint of hints) {
+    if (haystack.includes(hint)) return hint;
+  }
+
+  return '';
+}
+
+async function handle(reqData: {
+  placeId?: string;
+  place_id?: string;
+  name?: string;
+  address?: string;
+  category?: string;
+  keyword?: string;
+  refresh?: boolean;
+}) {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    return NextResponse.json({ ok: false, error: 'Missing Google Maps/Places API key' }, { status: 500 });
+  }
+
+  const placeId = (reqData.placeId ?? reqData.place_id ?? '').toString().trim();
+  const name = (reqData.name ?? '').toString().trim();
+  const address = (reqData.address ?? '').toString().trim();
+  const requestedCategory = (reqData.category ?? '').toString().trim().toLowerCase();
+  const requestedKeyword = (reqData.keyword ?? '').toString().trim().toLowerCase();
+  const refresh = Boolean(reqData.refresh);
+
+  if (!placeId) {
+    return NextResponse.json({ ok: false, error: 'Missing place_id' }, { status: 400 });
+  }
+
+  let finalPlaceId: string;
+  try {
+    finalPlaceId = await resolvePlaceId({ placeId, name, address, apiKey });
+  } catch (e: any) {
+    return NextResponse.json(
+      { ok: false, error: 'Could not resolve place_id', details: e?.message ?? String(e) },
+      { status: 400 }
+    );
+  }
+
+  const adminDb = getAdminDb();
+  const categoryKey = requestedCategory || 'default';
+  const keywordKey = requestedKeyword || 'none';
+  const cacheDocId = `${encodeURIComponent(finalPlaceId)}::${encodeURIComponent(categoryKey)}::${encodeURIComponent(keywordKey)}`;
+
+  if (!refresh && adminDb) {
+    try {
+      const cacheSnap = await adminDb.collection('competition_cache').doc(cacheDocId).get();
+      if (cacheSnap.exists) {
+        const cached = cacheSnap.data() as any;
+        const createdAtMs = cached?.createdAt ? new Date(cached.createdAt).getTime() : 0;
+        const fresh = createdAtMs > 0 && Date.now() - createdAtMs < CACHE_TTL_MS;
+        if (fresh && cached?.payload) {
+          return NextResponse.json({
+            ...cached.payload,
+            cached: true,
+            cachedAt: cached.createdAt,
+          });
+        }
+      }
+    } catch {
+      // Cache should not block live data.
+    }
+  }
 
   try {
-    // We use findplacefromtext because it accepts the /g/ ID as an input string
-    // and returns the canonical ChIJ... Place ID in the candidates.
-    const fallbackUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(
-      id
-    )}&inputtype=textquery&fields=place_id,name,geometry&key=${apiKey}`;
+    const business = await getPlaceDetails(finalPlaceId);
 
-    const response = await fetch(fallbackUrl);
-    
-    if (!response.ok) {
-      throw new Error(`Google API responded with status: ${response.status}`);
+    const category = requestedCategory || business.category;
+    const keywordForSearch = inferCuisineKeyword({
+      name: business.name,
+      category: business.category,
+      googleTypes: business.googleTypes,
+      requestedCategory,
+      requestedKeyword,
+    });
+
+    // Pull a single broad 5-mile pool, then bucket locally by distance.
+    // This avoids per-tier API pagination caps causing flat 39/40/40 counts.
+    const tier3Pool = await getNearbyCompetitors(
+      business.location,
+      milesToMetres(5),
+      category,
+      finalPlaceId,
+      keywordForSearch || undefined,
+      4,
+    );
+
+    const tier1Max = milesToMetres(1);
+    const tier2Max = milesToMetres(3);
+    const tier3Max = milesToMetres(5);
+
+    const pool = dedupeByPlaceId(tier3Pool);
+
+    // Cumulative zones:
+    // tier1: up to 1 mile, tier2: up to 3 miles (includes tier1),
+    // tier3: up to 5 miles (includes tier1 + tier2).
+    const tier1 = pool.filter((p) => (p.distanceMetres ?? Number.MAX_SAFE_INTEGER) <= tier1Max);
+    const tier2 = pool.filter((p) => (p.distanceMetres ?? Number.MAX_SAFE_INTEGER) <= tier2Max);
+    const tier3 = pool.filter((p) => (p.distanceMetres ?? Number.MAX_SAFE_INTEGER) <= tier3Max);
+
+    const stingCompetitor =
+      pickStingCompetitor(tier1) ??
+      pickStingCompetitor(tier2) ??
+      pickStingCompetitor(tier3);
+
+    let stingMessage = '';
+    if (stingCompetitor) {
+      try {
+        stingMessage = await generateStingMessage(
+          business.name,
+          stingCompetitor.name,
+          tier1.length,
+        );
+      } catch {
+        stingMessage = `Customers near you are being recommended to ${stingCompetitor.name}.`;
+      }
     }
 
-    const data = await response.json();
+    const payload = {
+      ok: true,
+      placeId: finalPlaceId,
+      business,
+      competitors: {
+        tier1,
+        tier2,
+        tier3,
+      },
+      counts: {
+        tier1: tier1.length,
+        tier2: tier2.length,
+        tier3: tier3.length,
+      },
+      searchKeywordUsed: keywordForSearch || null,
+      stingCompetitor,
+      stingMessage,
+      cached: false,
+    };
 
-    if (data.candidates && data.candidates.length > 0) {
-      return data.candidates[0].place_id;
+    if (adminDb) {
+      void adminDb.collection('competition_cache').doc(cacheDocId).set(
+        {
+          placeId: finalPlaceId,
+          category: categoryKey,
+          keyword: keywordKey,
+          createdAt: new Date().toISOString(),
+          payload,
+        },
+        { merge: true }
+      );
     }
 
-    throw new Error(`No Place ID mapping found for Feature ID: ${id}`);
-  } catch (err) {
-    console.error('Failed to resolve Place ID:', err);
-    throw err;
+    return NextResponse.json(payload);
+  } catch (e: any) {
+    return NextResponse.json(
+      { ok: false, error: e?.message ?? 'Failed to load competition data' },
+      { status: 500 }
+    );
   }
 }
 
-/**
- * Main Handler
- * Note: Switched to standard Response object for compatibility
- */
-export async function POST(req) {
-  try {
-    const body = await req.json();
-    const { placeId } = body;
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  return handle({
+    place_id: searchParams.get('place_id') ?? undefined,
+    placeId: searchParams.get('placeId') ?? undefined,
+    name: searchParams.get('name') ?? undefined,
+    address: searchParams.get('address') ?? undefined,
+    category: searchParams.get('category') ?? undefined,
+    keyword: searchParams.get('keyword') ?? undefined,
+    refresh: searchParams.get('refresh') === '1',
+  });
+}
 
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: 'Server configuration error: Missing API Key' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!placeId) {
-      return new Response(
-        JSON.stringify({ error: 'Missing placeId in request body' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // 1. Resolve the ID (Handling the /g/ IDs that caused the 500 error)
-    let finalPlaceId;
-    try {
-      finalPlaceId = await resolvePlaceId(placeId, apiKey);
-    } catch (resolveError) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Could not resolve location format.', 
-          details: resolveError.message 
-        }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // 2. Proceed with your competition logic using finalPlaceId
-    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${finalPlaceId}&key=${apiKey}`;
-    const detailsRes = await fetch(detailsUrl);
-    const detailsData = await detailsRes.json();
-
-    if (detailsData.status !== 'OK') {
-      return new Response(
-        JSON.stringify({ error: `Google Details API error: ${detailsData.status}` }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        placeId: finalPlaceId,
-        name: detailsData.result.name,
-        message: 'Competition location verified successfully'
-      }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
-    );
-
-  } catch (error) {
-    console.error('CRITICAL_API_ERROR:', error);
-    return new Response(
-      JSON.stringify({ error: 'Internal Server Error', message: error.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
+export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => ({}));
+  return handle(body);
 }

@@ -1,9 +1,9 @@
 import { getAdminDb } from '@/lib/firebase-admin';
-const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
 import { FieldValue } from 'firebase-admin/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import type { Lead, CampaignWave, NextLeadResponse } from '@/types';
+import { buildDemoLink } from '@/lib/resend';
 
 const LOCK_DURATION_MS     = 60_000;
 const MAX_RETRIES          = 6;
@@ -14,11 +14,19 @@ function getLeadLocalHour(utcOffsetHours: number): number {
 }
 
 function isInCallingWindow(lead: Lead, wave: CampaignWave): boolean {
-  const h = getLeadLocalHour(lead.utcOffsetHours);
+  const offset = typeof lead.utcOffsetHours === 'number' ? lead.utcOffsetHours : -5;
+  const h = getLeadLocalHour(offset);
   return h >= wave.startHourLocal && h < wave.endHourLocal;
 }
 
-async function isAgentOnline(agentId: string): Promise<boolean> {
+function isInDefaultCallingWindow(lead: Lead): boolean {
+  const offset = typeof lead.utcOffsetHours === 'number' ? lead.utcOffsetHours : -5;
+  const h = getLeadLocalHour(offset);
+  // Default business hours fallback when campaign linkage is missing.
+  return h >= 9 && h < 20;
+}
+
+async function isAgentOnline(adminDb: FirebaseFirestore.Firestore, agentId: string): Promise<boolean> {
   const snap = await adminDb.collection(COLLECTIONS.AGENTS).doc(agentId).get();
   if (!snap.exists) return false;
   const data  = snap.data()!;
@@ -28,13 +36,28 @@ async function isAgentOnline(agentId: string): Promise<boolean> {
 }
 
 export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
+  const adminDb = getAdminDb();
+  if (!adminDb) {
+    return { lead: null, queueDepth: 0, message: 'Firebase Admin not initialized.' };
+  }
+
   const leadsRef = adminDb.collection(COLLECTIONS.LEADS);
   const now      = new Date();
   const nowIso   = now.toISOString();
 
-  const campaignSnap    = await adminDb.collection(COLLECTIONS.CAMPAIGNS).where('isActive', '==', true).get();
-  const activeCampaigns = campaignSnap.docs.map(d => d.data() as CampaignWave);
-  if (!activeCampaigns.length) return { lead: null, queueDepth: 0, message: 'No active campaigns.' };
+  const campaignSnap = await adminDb
+    .collection(COLLECTIONS.CAMPAIGNS)
+    .where('isActive', '==', true)
+    .get();
+
+  // IMPORTANT: include the doc id (d.data() does not contain it)
+  const activeCampaigns = campaignSnap.docs.map(d => ({
+    id: d.id,
+    ...(d.data() as Omit<CampaignWave, 'id'>),
+  })) as CampaignWave[];
+
+  // Do not hard-stop dialing when campaigns are misconfigured.
+  // We use a default local-hours window fallback below.
 
   // ── Priority 1: Agent-owned callbacks that are due ────────────────────────
   const ownedSnap = await leadsRef
@@ -59,10 +82,10 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
     orphanSnap.docs
       .filter(d => d.data().ownerAgentId && d.data().ownerAgentId !== agentId)
       .map(async d => {
-        const online = await isAgentOnline(d.data().ownerAgentId);
+        const online = await isAgentOnline(adminDb, d.data().ownerAgentId);
         return online ? null : d;
       })
-  )).filter(Boolean);
+  )).filter(Boolean) as FirebaseFirestore.QueryDocumentSnapshot[];
 
   // ── Priority 3: Auto callbacks ────────────────────────────────────────────
   const autoSnap = await leadsRef
@@ -73,25 +96,64 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
     .get();
 
   // ── Priority 4: Fresh NEW leads ───────────────────────────────────────────
-  const activeCampaignIds = activeCampaigns.map(c => c.id);
-  const newSnap = await leadsRef
-    .where('status', '==', 'NEW')
-    .where('campaign', 'in', activeCampaignIds)
-    .orderBy('createdAt', 'asc')
-    .limit(50)
-    .get();
+  const activeCampaignIds = activeCampaigns.map(c => c.id).filter(Boolean);
+
+  // Query NEW leads broadly, then apply campaign-aware window filtering in memory.
+  let newSnap: FirebaseFirestore.QuerySnapshot;
+  try {
+    newSnap = await leadsRef
+      .where('status', '==', 'NEW')
+      .orderBy('createdAt', 'asc')
+      .limit(50)
+      .get();
+  } catch (err: any) {
+    const isMissingIndex = err?.code === 9 || /requires an index/i.test(String(err?.message ?? ''));
+    if (!isMissingIndex) throw err;
+
+    // Graceful fallback while a composite index is being created.
+    newSnap = await leadsRef
+      .where('status', '==', 'NEW')
+      .limit(200)
+      .get();
+  }
 
   const waveMap  = Object.fromEntries(activeCampaigns.map(c => [c.id, c]));
-  const newLeads = newSnap.docs
+  const hasActiveCampaigns = activeCampaignIds.length > 0;
+  const allNewLeads = newSnap.docs
     .map(d => ({ id: d.id, ...d.data() } as Lead))
-    .filter(l => waveMap[l.campaign] && isInCallingWindow(l, waveMap[l.campaign]));
+    .sort((a, b) => {
+      const aTs = Date.parse((a.createdAt as string) ?? '');
+      const bTs = Date.parse((b.createdAt as string) ?? '');
+      return (Number.isFinite(aTs) ? aTs : Number.MAX_SAFE_INTEGER)
+        - (Number.isFinite(bTs) ? bTs : Number.MAX_SAFE_INTEGER);
+    });
+
+  const newLeads = allNewLeads.filter((l) => {
+    const wave = waveMap[l.campaign];
+    if (wave) {
+      return isInCallingWindow(l, wave);
+    }
+
+    // If campaign is missing/unmapped, keep queue flowing with sane default window.
+    // Also used when there are no active campaigns configured.
+    if (!hasActiveCampaigns || !l.campaign || !waveMap[l.campaign]) {
+      return isInDefaultCallingWindow(l);
+    }
+
+    return false;
+  });
+
+  // Emergency fallback: if queue has NEW leads but none are currently in-window,
+  // continue dialing oldest NEW leads rather than hard-stalling the agent.
+  const useWindowFallback = !ownedSnap.docs.length && !orphans.length && !autoSnap.docs.length && !newLeads.length && allNewLeads.length > 0;
+  const freshCandidates = useWindowFallback ? allNewLeads.slice(0, 10) : newLeads;
 
   // Build candidate list in priority order
   const candidates = [
     ...ownedSnap.docs,
     ...orphans,
     ...autoSnap.docs,
-    ...newLeads.map(l => ({ id: l.id, data: () => l, exists: true })),
+    ...freshCandidates.map(l => ({ id: l.id, data: () => l, exists: true } as unknown as FirebaseFirestore.DocumentSnapshot)),
   ] as FirebaseFirestore.DocumentSnapshot[];
 
   if (!candidates.length) {
@@ -118,6 +180,14 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
 
         const lockExpiry = new Date(now.getTime() + LOCK_DURATION_MS).toISOString();
         const sessionId  = data.sessionId ?? uuidv4(); // generate if not already set
+        const lastUnlockUrl = buildDemoLink({
+          placeId: data.placeId,
+          kgmid: data.kgmid,
+          sessionId,
+          businessName: data.businessName,
+          address: data.address,
+          absolute: false,
+        });
 
         tx.update(docRef, {
           status:          'IN_PROGRESS',
@@ -125,18 +195,33 @@ export async function getNextLead(agentId: string): Promise<NextLeadResponse> {
           lockedUntil:     lockExpiry,
           lastCalledAt:    nowIso,
           sessionId,
+          ...(lastUnlockUrl ? { lastUnlockUrl, lastUnlockSavedAt: nowIso } : {}),
           updatedAt:       nowIso,
         });
 
-        return { ...data, id: snap.id, status: 'IN_PROGRESS', assignedAgentId: agentId, lockedUntil: lockExpiry, sessionId };
+        return {
+          ...data,
+          id: snap.id,
+          status: 'IN_PROGRESS',
+          assignedAgentId: agentId,
+          lockedUntil: lockExpiry,
+          sessionId,
+          ...(lastUnlockUrl ? { lastUnlockUrl, lastUnlockSavedAt: nowIso } : {}),
+        };
       });
 
       if (lockedLead) break;
-    } catch { continue; }
+    } catch {
+      continue;
+    }
   }
 
   const remaining = await leadsRef.where('status', 'in', ['NEW', 'CALLBACK_MANUAL', 'CALLBACK_AUTO']).count().get();
-  return { lead: lockedLead, queueDepth: remaining.data().count };
+  return {
+    lead: lockedLead,
+    queueDepth: remaining.data().count,
+    ...(useWindowFallback && lockedLead ? { message: 'No in-window leads. Dialing oldest NEW lead fallback.' } : {}),
+  };
 }
 
 export async function applyDisposition(
@@ -148,6 +233,9 @@ export async function applyDisposition(
   callbackDueAt?:  string,
   callbackNote?:   string,
 ): Promise<void> {
+  const adminDb = getAdminDb();
+  if (!adminDb) throw new Error('Firebase Admin not initialized.');
+
   const docRef = adminDb.collection(COLLECTIONS.LEADS).doc(leadId);
   const now    = new Date();
   const nowIso = now.toISOString();
@@ -204,4 +292,3 @@ export async function applyDisposition(
 
   await docRef.update(updates);
 }
-

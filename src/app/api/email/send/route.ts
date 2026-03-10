@@ -10,14 +10,14 @@ import { COLLECTIONS } from '@/lib/collections';
 
 export async function POST(req: NextRequest) {
   try {
-    const { to, subject, body, placeId, sessionId, agentId, leadId, callLogId } = await req.json();
+    const { to, subject, body, placeId, sessionId, businessName, address, agentId, leadId, callLogId } = await req.json();
 
     if (!to || !subject || !body) {
       return NextResponse.json({ error: 'to, subject, body required' }, { status: 400 });
     }
 
     // Send via Resend
-    const result = await sendEmail({ to, subject, body, placeId, sessionId });
+    const result = await sendEmail({ to, subject, body, placeId, sessionId, businessName, address });
 
     const nowIso = new Date().toISOString();
 
@@ -69,3 +69,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

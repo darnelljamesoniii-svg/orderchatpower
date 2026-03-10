@@ -5,9 +5,9 @@ export interface AppUser {
   email:       string;
   displayName: string;
   role:        'supervisor' | 'rep';
-  agentId?:    string;   // links to agents collection for reps
+  agentId?:    string;
   createdAt:   string;
-  createdBy:   string;   // supervisor uid who created this account
+  createdBy:   string;
   active:      boolean;
 }
 
@@ -21,32 +21,37 @@ export type LeadStatus =
   | 'EXHAUSTED';
 
 export interface Lead {
-  id:              string;
-  businessName:    string;
-  contactName:     string;
-  phone:           string;
-  phone2?:         string;       // ← NEW
-  email?:          string;       // ← NEW
-  kgmid:           string;
-  timezone:        string;
-  utcOffsetHours:  number;
-  status:          LeadStatus;
-  campaign:        string;
-  retryCount:      number;
-  sessionId?:      string;       // ← NEW generated on lead load
-  nextAvailableAt?: string;
-  assignedAgentId?: string;
-  ownerAgentId?:   string;       // ← NEW callback ownership
-  callbackDueAt?:  string;       // ← NEW scheduled callback time
-  callbackNote?:   string;       // ← NEW callback note
-  lockedUntil?:    string;
-  lastCalledAt?:   string;
-  closedAt?:       string;
-  notes?:          string;
-  address?:        string;
+  id:                string;
+  businessName:      string;
+  contactName:       string;
+  phone:             string;
+  phone2?:           string;
+  email?:            string;
+  kgmid?:            string;
+  placeId?:          string;
+  website?:          string;
+  city?:             string;
+  timezone?:         string;
+  utcOffsetHours?:   number;
+  status:            LeadStatus;
+  campaign:          string;
+  retryCount:        number;
+  sessionId?:        string;
+  nextAvailableAt?:  string;
+  assignedAgentId?:  string;
+  ownerAgentId?:     string;
+  callbackDueAt?:    string;
+  callbackNote?:     string;
+  lockedUntil?:      string;
+  lastCalledAt?:     string;
+  closedAt?:         string;
+  notes?:            string;
+  address?:          string;
+  lastUnlockUrl?:    string;
+  lastUnlockSavedAt?: string;
   squarePaymentUrl?: string;
-  createdAt:       string;
-  updatedAt:       string;
+  createdAt:         string;
+  updatedAt:         string;
 }
 
 export interface Disposition {
@@ -82,34 +87,34 @@ export interface Agent {
 }
 
 export interface AgentAlert {
-  id:          string;
-  type:        'return_visit' | 'callback_due';
-  leadId:      string;
+  id:           string;
+  type:         'return_visit' | 'callback_due';
+  leadId:       string;
   businessName: string;
-  message:     string;
-  placeId?:    string;
-  sessionId?:  string;
-  createdAt:   string;
-  read:        boolean;
+  message:      string;
+  placeId?:     string;
+  sessionId?:   string;
+  createdAt:    string;
+  read:         boolean;
 }
 
 export interface CallLog {
-  id?:              string;
-  leadId:           string;
-  agentId:          string;
-  callSid?:         string | null;
-  startedAt:        string;
-  endedAt?:         string;
-  durationSeconds?: number;
-  disposition?:     string;
+  id?:               string;
+  leadId:            string;
+  agentId:           string;
+  callSid?:          string | null;
+  startedAt:         string;
+  endedAt?:          string;
+  durationSeconds?:  number;
+  disposition?:      string;
   dispositionLabel?: string;
-  callStatus?:      string;
-  notes:            string;
-  transcript:       TranscriptEntry[];
-  summary?:         string;        // ← NEW Gemini coaching
-  coachingTips?:    string[];      // ← NEW
-  objections?:      string[];      // ← NEW
-  emailSentAt?:     string;        // ← NEW
+  callStatus?:       string;
+  notes:             string;
+  transcript:        TranscriptEntry[];
+  summary?:          string;
+  coachingTips?:     string[];
+  objections?:       string[];
+  emailSentAt?:      string;
 }
 
 export interface TranscriptEntry {
@@ -119,21 +124,21 @@ export interface TranscriptEntry {
 }
 
 export interface LPSession {
-  sessionId:         string;
-  placeId:           string;
-  agentId?:          string;
-  loadedAt:          string;
-  lastEventAt:       string;
-  step:              string;
-  stingCompleted?:   boolean;
-  zonesExpanded?:    string[];
+  sessionId:          string;
+  placeId:            string;
+  agentId?:           string;
+  loadedAt:           string;
+  lastEventAt:        string;
+  step:               string;
+  stingCompleted?:    boolean;
+  zonesExpanded?:     string[];
   selectedAvgTicket?: number;
-  tierHovered?:      string;
-  selectedTierId?:   string;
-  paymentOpened?:    boolean;
-  lockClicked?:      boolean;
-  returnVisits?:     number;
-  lastReturnAt?:     string;
+  tierHovered?:       string;
+  selectedTierId?:    string;
+  paymentOpened?:     boolean;
+  lockClicked?:       boolean;
+  returnVisits?:      number;
+  lastReturnAt?:      string;
 }
 
 export interface DispositionPayload {
@@ -145,8 +150,8 @@ export interface DispositionPayload {
   recallAt?:         string;
   notes?:            string;
   squareAmount?:     number;
-  callbackDueAt?:    string;   // ← NEW for RECALL
-  callbackNote?:     string;   // ← NEW
+  callbackDueAt?:    string;
+  callbackNote?:     string;
 }
 
 export type DispositionAction =
@@ -165,7 +170,7 @@ export interface NextLeadResponse {
 }
 
 export interface BattleCard {
-  rebuttal:    string;
-  followUp:    string;
-  toneAdvice:  string;
+  rebuttal:   string;
+  followUp:   string;
+  toneAdvice: string;
 }

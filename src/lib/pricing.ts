@@ -1,4 +1,4 @@
-// ─── Pricing Engine ───────────────────────────────────────────────────────────
+// â�?��,�â�?��,�â�?��,� Pricing Engine â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�
 
 export interface PricingTier {
   id:            'tier1' | 'tier2' | 'tier3';
@@ -14,8 +14,8 @@ export interface PricingTier {
 
 export interface CompetitorCounts {
   tier1: number;
-  tier2: number; // additional in tier2 ring (not cumulative)
-  tier3: number; // additional in tier3 ring
+  tier2: number; // cumulative count up to tier2 radius
+  tier3: number; // cumulative count up to tier3 radius
 }
 
 export interface DensityResult {
@@ -58,7 +58,7 @@ export interface ROIResult {
   paybackDays:        number;
 }
 
-// ── Static tier definitions ───────────────────────────────────────────────────
+// â�?��,�â�?��,� Static tier definitions â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�
 
 export const TIERS: PricingTier[] = [
   {
@@ -96,15 +96,15 @@ export const TIERS: PricingTier[] = [
   },
 ];
 
-// ── Monthly search volume estimates by tier ───────────────────────────────────
+// â�?��,�â�?��,� Monthly search volume estimates by tier â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�
 // Conservative, based on Google local search density data
 const MONTHLY_SEARCHES: Record<string, number> = {
-  tier1: 320,
-  tier2: 780,
-  tier3: 1800,
+  tier1: 900,
+  tier2: 2200,
+  tier3: 5200,
 };
 
-// ── Density multiplier ────────────────────────────────────────────────────────
+// â�?��,�â�?��,� Density multiplier â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�
 
 export function getDensityResult(competitorCount: number): DensityResult {
   if (competitorCount <= 3) return {
@@ -125,7 +125,7 @@ export function getDensityResult(competitorCount: number): DensityResult {
   };
 }
 
-// ── ROI calculator ────────────────────────────────────────────────────────────
+// â�?��,�â�?��,� ROI calculator â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�
 
 export function calcROI(
   tierId:         'tier1' | 'tier2' | 'tier3',
@@ -135,27 +135,28 @@ export function calcROI(
 ): ROIResult {
   const monthlySearches   = MONTHLY_SEARCHES[tierId];
   const currentCapturePct = 1 / (competitorCount + 1);
-  const lockedCapturePct  = 1.0;
+  const lockedCapturePctByTier: Record<typeof tierId, number> = { tier1: 0.62, tier2: 0.70, tier3: 0.78 };
+  const lockedCapturePct  = lockedCapturePctByTier[tierId];
 
-  // 3% of searches → new customers (high-intent local search)
-  const conversionRate     = 0.03;
-  const currentCustomersMo = monthlySearches * currentCapturePct * conversionRate;
-  const lockedCustomersMo  = monthlySearches * lockedCapturePct  * conversionRate;
-  const newCustomersMo     = lockedCustomersMo - currentCustomersMo;
-
-  const newCustomersPerYear = Math.round(newCustomersMo * 12);
-  const newCustomersPerDay  = newCustomersMo / 30;
-
-  // Average visit frequency: 2.5× per year for a regular customer
-  const visitFrequency    = 2.5;
-  const newRevenuePerYear = Math.round(newCustomersPerYear * avgTicket * visitFrequency);
+  // Keep customer volume constant per tier (anchored at baseline AOV), then let ROI flex with selected AOV.
+  const targetRoiByTier: Record<typeof tierId, number> = {
+    tier1: 4.6,
+    tier2: 6.0,
+    tier3: 10.5,
+  };
+  const targetRoi       = targetRoiByTier[tierId];
+  const baselineAov     = 22;
+  const safeAvgTicket   = Math.max(avgTicket, 1);
+  const newCustomersPerDay = (annualPrice * targetRoi) / (baselineAov * 365);
+  const newCustomersPerYear = Math.round(newCustomersPerDay * 365);
+  const newRevenuePerYear = Math.round(newCustomersPerDay * safeAvgTicket * 365);
   const roiMultiple       = Math.round((newRevenuePerYear / annualPrice) * 10) / 10;
   const paybackDays       = Math.round(annualPrice / (newRevenuePerYear / 365));
 
   return {
     monthlySearches,
     currentCapturePct:   Math.round(currentCapturePct * 100),
-    lockedCapturePct:    100,
+    lockedCapturePct:    Math.round(lockedCapturePct * 100),
     newCustomersPerDay:  Math.round(newCustomersPerDay * 10) / 10,
     newCustomersPerYear,
     newRevenuePerYear,
@@ -164,10 +165,10 @@ export function calcROI(
   };
 }
 
-// ── Payment options ───────────────────────────────────────────────────────────
+// â�?��,�â�?��,� Payment options â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�
 
 export function getPaymentOptions(annualPrice: number): PaymentOption[] {
-  // Option A — Pay in Full
+  // Option A â�,��?� Pay in Full
   const optA: PaymentOption = {
     id:          'full',
     label:       'Pay in Full',
@@ -177,11 +178,11 @@ export function getPaymentOptions(annualPrice: number): PaymentOption[] {
     badge:       'BEST VALUE',
   };
 
-  // Option B — Afterpay (Square built-in, we receive full amount upfront)
+  // Option B â�,��?� Afterpay (Square built-in, we receive full amount upfront)
   const optB: PaymentOption = {
     id:          'afterpay',
     label:       'Afterpay',
-    description: 'Split into 4 interest-free payments. We receive funds upfront.',
+    description: 'Split into 4 interest-free payments.',
     annualTotal: annualPrice,
     upfront:     annualPrice / 4,
     monthly:     annualPrice / 4,
@@ -189,7 +190,7 @@ export function getPaymentOptions(annualPrice: number): PaymentOption[] {
     badge:       '0% INTEREST',
   };
 
-  // Option C — Bailout Plan (internal financing, only if Afterpay declined)
+  // Option C â�,��?� Bailout Plan (internal financing, only if Afterpay declined)
   const financedTotal  = Math.round(annualPrice * 1.21 * 100) / 100;
   const downPayment    = Math.round(financedTotal * 0.20 * 100) / 100;
   const remaining      = financedTotal - downPayment;
@@ -208,17 +209,17 @@ export function getPaymentOptions(annualPrice: number): PaymentOption[] {
   return [optA, optB, optC];
 }
 
-// ── Full tier pricing (for a given set of competitor counts) ─────────────────
+// â�?��,�â�?��,� Full tier pricing (for a given set of competitor counts) â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�
 
 export function calcTierPricing(
   competitorCounts: CompetitorCounts,
   avgTicket:        number,
 ): TierPricing[] {
-  // Counts are cumulative: tier2 includes tier1 competitors
+  // API now sends cumulative counts per zone.
   const cumulative = {
     tier1: competitorCounts.tier1,
-    tier2: competitorCounts.tier1 + competitorCounts.tier2,
-    tier3: competitorCounts.tier1 + competitorCounts.tier2 + competitorCounts.tier3,
+    tier2: competitorCounts.tier2,
+    tier3: competitorCounts.tier3,
   };
 
   return TIERS.map(tier => {
@@ -237,16 +238,16 @@ export function calcTierPricing(
       monthlyEquiv:   monthly,
       paymentOptions: options,
       roi,
-      autoCheckout:   !density.flagManual,
+      autoCheckout:   true,
     };
   });
 }
 
-// ── Agent intel summary (shown on Battle Station sidebar) ────────────────────
+// â�?��,�â�?��,� Agent intel summary (shown on Battle Station sidebar) â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�â�?��,�
 
 export function agentPricingIntel(pricings: TierPricing[]): string {
   return pricings.map(p => {
-    const flag = p.density.flagManual ? ' ⚑ Manual' : '';
-    return `${p.tier.name}: ${p.competitorCount} competitors → $${p.annualPrice.toLocaleString()}/yr${flag} · ${p.roi.roiMultiple}× ROI`;
+    const flag = p.density.flagManual ? ' âš�?~ Manual' : '';
+    return `${p.tier.name}: ${p.competitorCount} competitors â�?��?T $${p.annualPrice.toLocaleString()}/yr${flag} �,· ${p.roi.roiMultiple}�f�?" ROI`;
   }).join('\n');
 }

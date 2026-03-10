@@ -5,6 +5,14 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "status",          "order": "ASCENDING" },
+        { "fieldPath": "createdAt",       "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "leads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",          "order": "ASCENDING" },
         { "fieldPath": "nextAvailableAt", "order": "ASCENDING" }
       ]
     },

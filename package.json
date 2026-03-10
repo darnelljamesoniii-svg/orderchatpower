@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "links:build": "node scripts/generate-unlock-links.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.15.0",

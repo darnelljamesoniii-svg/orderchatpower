@@ -1,105 +1,177 @@
 import { getAdminDb } from '@/lib/firebase-admin';
-const adminDb = getAdminDb();
 import { COLLECTIONS } from '@/lib/collections';
 import type { Lead } from '@/types';
 
 export interface CsvRow {
-  businessName:   string;
-  contactName:    string;
-  phone:          string;
-  phone2?:        string;
-  email?:         string;
-  kgmid:          string;
-  timezone:       string;
-  utcOffsetHours: number;
-  campaign?:      string;  // optional — assigned by supervisor at import time
-  address?:       string;
+  businessName: string;
+  Full_Address?: string;
+  City?: string;
+  Website?: string;
+  Email_From_WEBSITE?: string;
+  Phone_1: string;
+  Zip?: string;
+  Place_ID?: string;
+  contactName: string;
+  campaign?: 'wave1' | 'wave2' | string;
 }
 
 export interface ImportResult {
-  imported:   number;
+  imported: number;
   duplicates: number;
-  errors:     string[];
+  errors: string[];
 }
 
-/**
- * Normalises a phone number to E.164 format (digits only, with country code).
- */
 function normalisePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
-  return digits.length === 10 ? `+1${digits}` : `+${digits}`;
+  const digits = String(phone || '').replace(/\D/g, '');
+
+  if (!digits) {
+    throw new Error('Missing phone number');
+  }
+
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
+
+  return `+${digits}`;
 }
 
-/**
- * Import CSV rows into Firestore, deduplicating on phone AND kgmid.
- * Uses batched writes (max 500/batch).
- */
+function deriveTimezone(row: CsvRow): { timezone: string; utcOffsetHours: number } {
+  const text = `${row.Full_Address || ''} ${row.City || ''} ${row.Zip || ''}`.toLowerCase();
+
+  if (
+    text.includes('ca') ||
+    text.includes('california') ||
+    text.includes('los angeles') ||
+    text.includes('san diego') ||
+    text.includes('san francisco') ||
+    text.includes('seattle') ||
+    text.includes('washington')
+  ) {
+    return { timezone: 'America/Los_Angeles', utcOffsetHours: -8 };
+  }
+
+  if (
+    text.includes('co') ||
+    text.includes('colorado') ||
+    text.includes('denver') ||
+    text.includes('az') ||
+    text.includes('arizona') ||
+    text.includes('phoenix')
+  ) {
+    return { timezone: 'America/Denver', utcOffsetHours: -7 };
+  }
+
+  if (
+    text.includes('tx') ||
+    text.includes('texas') ||
+    text.includes('chicago') ||
+    text.includes('illinois') ||
+    text.includes('tn') ||
+    text.includes('tennessee')
+  ) {
+    return { timezone: 'America/Chicago', utcOffsetHours: -6 };
+  }
+
+  return { timezone: 'America/New_York', utcOffsetHours: -5 };
+}
+
 export async function importLeads(rows: CsvRow[]): Promise<ImportResult> {
+  const adminDb = getAdminDb();
   const leadsRef = adminDb.collection(COLLECTIONS.LEADS);
   const result: ImportResult = { imported: 0, duplicates: 0, errors: [] };
 
-  // Pre-fetch all existing phones and kgmids in one go
-  const existingPhonesSnap = await leadsRef.select('phone', 'kgmid').get();
-  const existingPhones  = new Set<string>();
-  const existingKgmids  = new Set<string>();
+  const existingSnap = await leadsRef.select('phone', 'placeId').get();
+  const existingPhones = new Set<string>();
+  const existingPlaceIds = new Set<string>();
 
-  existingPhonesSnap.docs.forEach(d => {
-    const data = d.data();
-    if (data.phone)  existingPhones.add(normalisePhone(data.phone));
-    if (data.kgmid)  existingKgmids.add(data.kgmid);
+  existingSnap.docs.forEach((doc) => {
+    const data = doc.data() as any;
+    if (data.phone) {
+      try {
+        existingPhones.add(normalisePhone(String(data.phone)));
+      } catch {
+        // ignore malformed stored phone
+      }
+    }
+    if (data.placeId) {
+      existingPlaceIds.add(String(data.placeId).trim());
+    }
   });
 
   const BATCH_SIZE = 450;
-  let batch        = adminDb.batch();
-  let batchCount   = 0;
+  let batch = adminDb.batch();
+  let batchCount = 0;
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    try {
-      const normPhone = normalisePhone(row.phone);
 
-      if (existingPhones.has(normPhone) || existingKgmids.has(row.kgmid)) {
+    try {
+      if (!row.businessName?.trim()) {
+        throw new Error('Missing businessName');
+      }
+
+      if (!row.contactName?.trim()) {
+        throw new Error('Missing contactName');
+      }
+
+      if (!row.Phone_1?.trim()) {
+        throw new Error('Missing Phone_1');
+      }
+
+      const normPhone = normalisePhone(row.Phone_1);
+      const placeId = row.Place_ID?.trim() || '';
+
+      if (existingPhones.has(normPhone) || (placeId && existingPlaceIds.has(placeId))) {
         result.duplicates++;
         continue;
       }
 
-      const now   = new Date().toISOString();
-      const docId = leadsRef.doc().id;
+      const { timezone, utcOffsetHours } = deriveTimezone(row);
+      const now = new Date().toISOString();
+
       const lead: Omit<Lead, 'id'> = {
-        businessName:   row.businessName,
-        contactName:    row.contactName,
-        phone:          normPhone,
-        phone2:         row.phone2 || undefined,
-        email:          row.email  || undefined,
-        kgmid:          row.kgmid,
-        address:        row.address || undefined,
-        timezone:       row.timezone,
-        utcOffsetHours: Number(row.utcOffsetHours),
-        status:         'NEW',
-        retryCount:     0,
-        campaign:       row.campaign ?? 'general',
-        createdAt:      now,
-        updatedAt:      now,
+        businessName: row.businessName.trim(),
+        placeId: placeId || undefined,
+        contactName: row.contactName.trim(),
+        phone: normPhone,
+        email: row.Email_From_WEBSITE?.trim() || undefined,
+        address: row.Full_Address?.trim() || undefined,
+        website: row.Website?.trim() || undefined,
+        city: row.City?.trim() || undefined,
+        timezone,
+        utcOffsetHours,
+        status: 'NEW',
+        retryCount: 0,
+        campaign: row.campaign ?? 'wave1',
+        createdAt: now,
+        updatedAt: now,
       };
 
-      batch.set(leadsRef.doc(docId), lead);
+      const docRef = leadsRef.doc();
+      batch.set(docRef, lead);
+
       existingPhones.add(normPhone);
-      existingKgmids.add(row.kgmid);
-      batchCount++;
+      if (placeId) existingPlaceIds.add(placeId);
       result.imported++;
+      batchCount++;
 
       if (batchCount >= BATCH_SIZE) {
         await batch.commit();
-        batch      = adminDb.batch();
+        batch = adminDb.batch();
         batchCount = 0;
       }
     } catch (err: unknown) {
-      result.errors.push(`Row ${i + 1}: ${err instanceof Error ? err.message : String(err)}`);
+      result.errors.push(`Row ${i + 2}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  if (batchCount > 0) await batch.commit();
+  if (batchCount > 0) {
+    await batch.commit();
+  }
 
   return result;
 }
-
