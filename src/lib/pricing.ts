@@ -138,17 +138,18 @@ export function calcROI(
   const lockedCapturePctByTier: Record<typeof tierId, number> = { tier1: 0.62, tier2: 0.70, tier3: 0.78 };
   const lockedCapturePct  = lockedCapturePctByTier[tierId];
 
-  // Target ROI by tier, with orders/day flexing based on AOV.
+  // Keep customer volume constant per tier (anchored at baseline AOV), then let ROI flex with selected AOV.
   const targetRoiByTier: Record<typeof tierId, number> = {
     tier1: 4.6,
     tier2: 6.0,
     tier3: 10.5,
   };
-  const targetRoi         = targetRoiByTier[tierId];
-  const newRevenuePerYear = Math.round(annualPrice * targetRoi);
-  const safeAvgTicket     = Math.max(avgTicket, 1);
-  const newCustomersPerDay  = newRevenuePerYear / (safeAvgTicket * 365);
+  const targetRoi       = targetRoiByTier[tierId];
+  const baselineAov     = 22;
+  const safeAvgTicket   = Math.max(avgTicket, 1);
+  const newCustomersPerDay = (annualPrice * targetRoi) / (baselineAov * 365);
   const newCustomersPerYear = Math.round(newCustomersPerDay * 365);
+  const newRevenuePerYear = Math.round(newCustomersPerDay * safeAvgTicket * 365);
   const roiMultiple       = Math.round((newRevenuePerYear / annualPrice) * 10) / 10;
   const paybackDays       = Math.round(annualPrice / (newRevenuePerYear / 365));
 

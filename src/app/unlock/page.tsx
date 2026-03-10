@@ -92,7 +92,7 @@ function ROIBadge({ roi }: { roi: TierPricing['roi'] }) {
           <div className="text-gray-400 text-xs">to break even</div>
         </div>
       </div>
-      <div className="text-gray-500 text-[10px]">Based on tier ROI targets with AOV-adjusted order volume</div>
+      <div className="text-gray-500 text-[10px]">Based on tier ROI targets with AOV-adjusted revenue</div>
     </div>
   );
 }
@@ -278,7 +278,7 @@ function UnlockPageContent() {
   const [competitors,   setCompetitors]   = useState<{ tier1: NearbyPlace[]; tier2: NearbyPlace[]; tier3: NearbyPlace[] } | null>(null);
   const [counts,        setCounts]        = useState<{ tier1: number; tier2: number; tier3: number } | null>(null);
   const [pricings,      setPricings]      = useState<TierPricing[] | null>(null);
-  const [avgTicket,     setAvgTicket]     = useState(28);
+  const [avgTicket,     setAvgTicket]     = useState(28.5);
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState('');
   const [stingDone,     setStingDone]     = useState(false);
